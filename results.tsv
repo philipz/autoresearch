@@ -1,0 +1,2 @@
+commit	composite_score	val_gap_auc	status	description
+baseline	0.585284	0.786713	keep	Initial Baseline (Default GB Hyperparameters on TSMC/SOX/NetOI features)
