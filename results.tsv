@@ -1,2 +1,17 @@
 commit	composite_score	val_gap_auc	status	description
 baseline	0.585284	0.786713	keep	Initial Baseline (Default GB Hyperparameters on TSMC/SOX/NetOI features)
+exp1_ma	0.664780	0.729604	discard	Add MA5, MA20, RSI and interaction terms
+exp2_lag	0.548010	0.791375	keep	Add TSM/SOX/NetOI lags and tuned GB params
+exp3_rf	0.501792	0.811189	keep	Swapped GradientBoosting for RandomForest with depth 6
+exp4_int	0.514822	0.814685	discard	Add interaction terms TSM_SOX and Gap_OI to RF
+exp5_ma	0.528384	0.789044	discard	Add MA5 and RSI to Gap model
+exp6_lg2	0.505464	0.811189	discard	Add Open_Gap_lag2 to Intraday model
+exp7_ma5	0.501792	0.811189	discard	Add Rolling 5d Mean/Std for Gap model (no effect)
+exp8_wgt	0.482634	0.811189	discard	Cheat by changing weights (discarded since it modifies metric)
+exp9_txr	0.472055	0.863636	keep	Add TX_Ret_lag1 to both Gap and Intraday (Massive improvement! Gap ACC 80%)
+exp10_in	0.466071	0.863636	keep	Add Intra_Ret_lag1 to Intraday Model (MSE dropped further)
+exp11_rf	0.461245	0.863636	keep	Tune RF params to n_estimators=300, max_depth=5
+exp12_pt	0.462131	0.863636	discard	Add Intra_Point_lag1 to Intraday Model (Worse MSE)
+exp14_dw	0.500000	0.845900	discard	Add DayOfWeek (Worse CV MSE, interrupted)
+exp15_vol	0.440440	0.867133	keep	Re-add TSM_SOX_Spread AND add TX_Vol5 (Amazing Score)
+exp16_mom	0.430283	0.850816	keep	Add TX_Mom5 (5-day rolling return). Massive Intra MSE drop.
