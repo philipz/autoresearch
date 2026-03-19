@@ -78,6 +78,8 @@ def engineer_features(df):
     # Lagged gap and intraday info
     X_gap['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
     X_gap['Open_Gap_lag2'] = df['Open_Gap'].shift(2)
+    X_gap['Open_Gap_5d_mean'] = df['Open_Gap'].rolling(5).mean()
+    X_gap['Open_Gap_5d_std'] = df['Open_Gap'].rolling(5).std()
     X_gap['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     X_gap['Intra_Ret_lag2'] = df['Intraday_Ret'].shift(2)
     X_gap['TX_Ret_cumret3'] = df['TX_Ret'].rolling(3).sum()
