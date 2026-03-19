@@ -142,6 +142,10 @@ def engineer_features(df):
     # Intraday point info (lag)
     X_intra['Intra_Point_lag1'] = df['Intraday_Point'].shift(1)
     X_intra['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
+    # EMA features for intraday
+    X_intra['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
+    X_intra['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
+    X_intra['EMA5_EMA10_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA10']
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
