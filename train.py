@@ -281,6 +281,8 @@ GAP_REG_PARAMS = dict(
     reg_alpha=0.35,
     reg_lambda=2.2,
     gamma=0.25,
+    max_leaves=15,
+    grow_policy='lossguide',
     random_state=RANDOM_SEED,
 )
 USE_XGB_REG = True
