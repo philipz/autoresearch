@@ -183,6 +183,8 @@ def engineer_features(df):
     X_intra['EMA10_EMA30_Spread'] = X_intra['TX_EMA10'] - X_intra['TX_EMA30']
     X_intra['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
     X_intra['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
+    X_intra['Intra_EMA20'] = df['Intraday_Ret'].ewm(span=20).mean()
+    X_intra['Intra_EMA5_EMA20_Spread'] = X_intra['Intra_EMA5'] - X_intra['Intra_EMA20']
     X_intra['NetOI_EMA5'] = df['NetOI_Diff'].ewm(span=5).mean()
     # TSM/SOX EMA for intraday
     X_intra['TSM_EMA5'] = df['TSM_Ret'].ewm(span=5).mean()
