@@ -192,6 +192,11 @@ def engineer_features(df):
     # Gap EMA for intraday
     X_intra['Gap_EMA5'] = df['Open_Gap'].ewm(span=5).mean()
     X_intra['Gap_EMA10'] = df['Open_Gap'].ewm(span=10).mean()
+    # TSM/SOX longer EMA for intraday
+    X_intra['TSM_EMA10'] = df['TSM_Ret'].ewm(span=10).mean()
+    X_intra['SOX_EMA10'] = df['SOX_Ret'].ewm(span=10).mean()
+    # Intraday Point EMA
+    X_intra['IntraPoint_EMA5'] = df['Intraday_Point'].ewm(span=5).mean()
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
