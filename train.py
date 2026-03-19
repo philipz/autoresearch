@@ -109,6 +109,9 @@ def engineer_features(df):
     if 'Sentiment_Score' in df.columns:
         X_intra['Sentiment_Score'] = df['Sentiment_Score']
         X_intra['Sentiment_Conf'] = df['Sentiment_Conf']
+    # 20-day rolling stats
+    X_intra['TX_Vol20'] = df['TX_Ret'].rolling(20).std()
+    X_intra['TX_Mom20'] = df['TX_Ret'].rolling(20).sum()
     # Non-linear gap effect
     X_intra['Open_Gap_sq'] = df['Open_Gap'] ** 2
     X_intra['Open_Gap_abs'] = df['Open_Gap'].abs()
