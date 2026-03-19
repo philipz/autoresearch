@@ -261,6 +261,7 @@ GAP_REG_PARAMS = dict(
     colsample_bytree=0.7,
     reg_alpha=0.1,
     reg_lambda=1.0,
+    gamma=0.1,
     random_state=RANDOM_SEED,
 )
 USE_XGB_REG = True
