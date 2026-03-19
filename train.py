@@ -83,6 +83,15 @@ def engineer_features(df):
     X_gap['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     X_gap['Intra_Ret_lag2'] = df['Intraday_Ret'].shift(2)
     X_gap['TX_Ret_cumret3'] = df['TX_Ret'].rolling(3).sum()
+    # Deeper lags
+    X_gap['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
+    X_gap['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
+    X_gap['TSM_Ret_lag3'] = df['TSM_Ret'].shift(2)  # actual lag3 of TSM
+    # Day of week seasonality
+    if hasattr(df.index, 'dayofweek'):
+        X_gap['day_of_week'] = df.index.dayofweek
+    else:
+        X_gap['day_of_week'] = pd.to_datetime(df.index).dayofweek
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
