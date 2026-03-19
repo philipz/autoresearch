@@ -119,6 +119,12 @@ def engineer_features(df):
     X_gap['Gap_EMA5_EMA20_Spread'] = X_gap['Gap_EMA5'] - X_gap['Gap_EMA20']
     # NetOI longer EMA
     X_gap['NetOI_EMA10'] = df['NetOI_Diff'].ewm(span=10).mean()
+    # SOX/TSM longer EMA
+    X_gap['TSM_EMA10'] = df['TSM_Ret'].ewm(span=10).mean()
+    X_gap['SOX_EMA10'] = df['SOX_Ret'].ewm(span=10).mean()
+    X_gap['TSM_SOX_EMA_Spread'] = X_gap['TSM_EMA5'] - X_gap['SOX_EMA5']
+    # Open_Gap EWM volatility
+    X_gap['Gap_EWM_Vol5'] = df['Open_Gap'].ewm(span=5).std()
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
