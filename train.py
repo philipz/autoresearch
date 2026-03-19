@@ -67,6 +67,12 @@ def engineer_features(df):
     X_gap['TSM_SOX_Spread'] = X_gap['TSM_Ret'] - X_gap['SOX_Ret']
     X_gap['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_gap['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    # Sentiment features (T-1, pre-shifted in prepare.py)
+    if 'Sentiment_Score' in df.columns:
+        X_gap['Sentiment_Score'] = df['Sentiment_Score']
+        X_gap['Sentiment_Conf'] = df['Sentiment_Conf']
+        # Interaction: sentiment amplified by momentum
+        X_gap['Sent_Mom'] = df['Sentiment_Score'] * X_gap['TX_Mom5'].fillna(0)
     X_gap.fillna(0, inplace=True) # Fill initial lag NAs
 
     # --- Intraday model features ---
@@ -77,6 +83,10 @@ def engineer_features(df):
     X_intra['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     X_intra['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_intra['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    # Sentiment features (T-1, pre-shifted in prepare.py)
+    if 'Sentiment_Score' in df.columns:
+        X_intra['Sentiment_Score'] = df['Sentiment_Score']
+        X_intra['Sentiment_Conf'] = df['Sentiment_Conf']
     X_intra.fillna(0, inplace=True)
 
     # --- Targets ---
