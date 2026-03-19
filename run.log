@@ -1,0 +1,41 @@
+Data loaded: train=286, val=61, test=62
+============================================================
+Autoresearch Sandbox — Training
+============================================================
+
+Running 5-fold TimeSeriesSplit CV...
+  Fold 1: AUC=0.7989, MAE=103.27, MSE=0.00005042
+  Fold 2: AUC=0.8370, MAE=189.31, MSE=0.00017797
+  Fold 3: AUC=0.8200, MAE=122.37, MSE=0.00005580
+  Fold 4: AUC=0.9094, MAE=199.97, MSE=0.00009269
+  Fold 5: AUC=0.8528, MAE=160.01, MSE=0.00006555
+
+CV Averages:
+  Gap AUC:     0.8436 ± 0.0375
+  Gap MAE:     154.99 ± 37.32
+  Intra MSE:   0.00008849 ± 0.00004705
+
+Training final models on full training set...
+
+Validation set evaluation:
+  Gap Accuracy: 0.7869
+  Gap AUC:      0.8566
+  Gap MAE:      76.99 points
+  Intra MSE:    0.00003878
+  Intra MAE:    0.005199
+
+---
+composite_score:  0.429100
+val_gap_auc:      0.856643
+val_gap_acc:      0.786885
+val_gap_mae:      76.99
+val_intra_mse:    0.00003878
+val_intra_mae:    0.005199
+cv_gap_auc_mean:  0.843624
+cv_gap_mae_mean:  154.99
+cv_intra_mse_mean:0.00008849
+training_seconds: 2.4
+total_seconds:    2.4
+n_splits:         5
+train_rows:       286
+val_rows:         61
