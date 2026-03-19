@@ -138,5 +138,42 @@ def main():
         print(f"Note: {len(missing) - live_count} historical days filled with neutral (0.0) placeholders.")
 
 
+def test_live():
+    """--test 模式：直接抓今日 RSS 並呼叫 Gemini API，驗證連線正常。不寫入快取。"""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        print("ERROR: GEMINI_API_KEY environment variable not set.")
+        sys.exit(1)
+
+    print("=" * 60)
+    print("Sentiment Live Test (today only, no cache write)")
+    print("=" * 60)
+
+    fetcher = SentimentFetcher(api_key=api_key)
+    today = date.today()
+
+    print(f"\nFetching RSS headlines for {today}...")
+    headlines = fetcher.fetch_rss_headlines(today)
+    print(f"Got {len(headlines)} headlines")
+    for h in headlines[:5]:
+        print(f"  - {h}")
+
+    if not headlines:
+        print("\nWARNING: No headlines fetched (RSS may be unavailable).")
+        print("Sending dummy headline to test Gemini API...")
+        headlines = ["US stocks rise as Fed signals rate cut pause"]
+
+    print(f"\nCalling Gemini API ({fetcher._model_name})...")
+    result = fetcher.analyze_sentiment(headlines, today)
+
+    print(f"\nResult:")
+    print(f"  score:      {result['score']:+.3f}  (-1=bearish, +1=bullish for TX)")
+    print(f"  confidence: {result['confidence']:.3f}")
+    print(f"  key_events: {result['key_events']}")
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        test_live()
+    else:
+        main()
