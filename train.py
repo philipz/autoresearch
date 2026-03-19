@@ -18,7 +18,7 @@ import time
 import warnings
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, ExtraTreesRegressor
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import (
     roc_auc_score,
@@ -198,14 +198,14 @@ def train_and_evaluate_cv(train_df, val_df):
         cv_gap_auc.append(auc)
 
         # Gap Regressor
-        reg = RandomForestRegressor(**GAP_REG_PARAMS)
+        reg = ExtraTreesRegressor(**GAP_REG_PARAMS)
         reg.fit(X_gap_train.iloc[tr_idx], y_gap_val_train.iloc[tr_idx])
         preds = reg.predict(X_gap_train.iloc[te_idx])
         mae = mean_absolute_error(y_gap_val_train.iloc[te_idx], preds)
         cv_gap_mae.append(mae)
 
         # Intraday Regressor
-        intra = RandomForestRegressor(**INTRA_REG_PARAMS)
+        intra = ExtraTreesRegressor(**INTRA_REG_PARAMS)
         intra.fit(X_intra_train.iloc[tr_idx], y_intra_train.iloc[tr_idx])
         intra_preds = intra.predict(X_intra_train.iloc[te_idx])
         mse = mean_squared_error(y_intra_train.iloc[te_idx], intra_preds)
@@ -224,10 +224,10 @@ def train_and_evaluate_cv(train_df, val_df):
     gap_clf = GradientBoostingClassifier(**GAP_CLF_PARAMS)
     gap_clf.fit(X_gap_train, y_gap_dir_train)
 
-    gap_reg = RandomForestRegressor(**GAP_REG_PARAMS)
+    gap_reg = ExtraTreesRegressor(**GAP_REG_PARAMS)
     gap_reg.fit(X_gap_train, y_gap_val_train)
 
-    intra_reg = RandomForestRegressor(**INTRA_REG_PARAMS)
+    intra_reg = ExtraTreesRegressor(**INTRA_REG_PARAMS)
     intra_reg.fit(X_intra_train, y_intra_train)
 
     # --- Validation set evaluation ---
