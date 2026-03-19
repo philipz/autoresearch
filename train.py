@@ -70,6 +70,9 @@ def engineer_features(df):
     X_gap['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
     X_gap['TX_Vol10'] = df['TX_Ret'].rolling(10).std()
     X_gap['TX_Mom10'] = df['TX_Ret'].rolling(10).sum()
+    # 20-day rolling stats
+    X_gap['TX_Vol20'] = df['TX_Ret'].rolling(20).std()
+    X_gap['TX_Mom20'] = df['TX_Ret'].rolling(20).sum()
     # Institutional flow
     X_gap['NetOI_Diff'] = df['NetOI_Diff']
     # Lagged gap and intraday info
