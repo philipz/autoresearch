@@ -262,7 +262,8 @@ USE_XGB_REG = True
 INTRA_REG_PARAMS = dict(
     n_estimators=700,
     max_depth=None,
-    min_samples_split=5,
+    min_samples_split=3,
+    min_samples_leaf=2,
     random_state=RANDOM_SEED,
 )
 
