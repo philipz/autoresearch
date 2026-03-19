@@ -134,24 +134,6 @@ def engineer_features(df):
         X_gap['Sentiment_Conf'] = df['Sentiment_Conf']
         # Interaction: sentiment amplified by momentum
         X_gap['Sent_Mom'] = df['Sentiment_Score'] * X_gap['TX_Mom5'].fillna(0)
-    # MACD features
-    X_gap['TSM_MACD'] = X_gap['TSM_EMA5'] - X_gap['TSM_EMA10']
-    X_gap['SOX_MACD'] = X_gap['SOX_EMA5'] - X_gap['SOX_EMA10']
-    X_gap['TX_MACD'] = X_gap['TX_EMA5'] - X_gap['TX_EMA20']
-    # Additional gap lags and rolling
-    X_gap['Open_Gap_lag3'] = df['Open_Gap'].shift(3)
-    X_gap['Open_Gap_lag4'] = df['Open_Gap'].shift(4)
-    X_gap['Open_Gap_10d_mean'] = df['Open_Gap'].rolling(10).mean()
-    X_gap['Open_Gap_10d_std'] = df['Open_Gap'].rolling(10).std()
-    X_gap['Open_Gap_20d_mean'] = df['Open_Gap'].rolling(20).mean()
-    # NetOI rolling
-    X_gap['NetOI_5d_mean'] = df['NetOI_Diff'].rolling(5).mean()
-    X_gap['NetOI_10d_mean'] = df['NetOI_Diff'].rolling(10).mean()
-    # Intra deeper lags
-    X_gap['Intra_Ret_lag3'] = df['Intraday_Ret'].shift(3)
-    # TSM/SOX deeper lags
-    X_gap['TSM_Ret_lag4'] = df['TSM_Ret'].shift(3)
-    X_gap['SOX_Ret_lag3'] = df['SOX_Ret'].shift(2)
     X_gap.fillna(0, inplace=True) # Fill initial lag NAs
 
     # --- Intraday model features ---
@@ -257,16 +239,13 @@ def engineer_features(df):
 
 # Gap Direction Classifier (XGBoost)
 GAP_CLF_PARAMS = dict(
-    n_estimators=3000,
-    max_depth=4,
-    learning_rate=0.01,
-    subsample=0.75,
-    colsample_bytree=0.7,
-    reg_alpha=0.2,
-    reg_lambda=1.5,
-    gamma=0.2,
-    max_leaves=12,
-    grow_policy='lossguide',
+    n_estimators=2000,
+    max_depth=5,
+    learning_rate=0.008,
+    subsample=0.7,
+    colsample_bytree=0.8,
+    reg_alpha=0.1,
+    reg_lambda=1.0,
     random_state=RANDOM_SEED,
     use_label_encoder=False,
     eval_metric='logloss',
@@ -275,16 +254,14 @@ USE_XGB_CLF = True
 
 # Gap Value Regressor (XGBRegressor)
 GAP_REG_PARAMS = dict(
-    n_estimators=4000,
+    n_estimators=3500,
     max_depth=4,
-    learning_rate=0.01,
+    learning_rate=0.008,
     subsample=0.75,
     colsample_bytree=0.7,
-    reg_alpha=0.35,
-    reg_lambda=2.2,
-    gamma=0.25,
-    max_leaves=15,
-    grow_policy='lossguide',
+    reg_alpha=0.1,
+    reg_lambda=1.0,
+    gamma=0.2,
     random_state=RANDOM_SEED,
 )
 USE_XGB_REG = True
