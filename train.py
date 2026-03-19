@@ -115,6 +115,10 @@ def engineer_features(df):
     # Open_Gap EMA
     X_gap['Gap_EMA5'] = df['Open_Gap'].ewm(span=5).mean()
     X_gap['Gap_EMA10'] = df['Open_Gap'].ewm(span=10).mean()
+    X_gap['Gap_EMA20'] = df['Open_Gap'].ewm(span=20).mean()
+    X_gap['Gap_EMA5_EMA20_Spread'] = X_gap['Gap_EMA5'] - X_gap['Gap_EMA20']
+    # NetOI longer EMA
+    X_gap['NetOI_EMA10'] = df['NetOI_Diff'].ewm(span=10).mean()
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
