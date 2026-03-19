@@ -1,2 +1,77 @@
 commit	composite_score	val_gap_auc	status	description
 3edf98a	0.429100	0.856643	keep	Baseline with sentiment features (historical scores all 0.0)
+0ddd87a	0.341675	0.875291	discard	TSM_SOX_Spread lag1 to gap model
+8bcf601	0.336912	0.874126	keep	XGB clf n=600 colsample=0.9
+2c29909	0.336292	0.874126	keep	XGBRegressor gap n=2000 lr=0.01
+984b5b8	0.336586	0.871795	discard	LightGBM clf gap (n=1000, leaves=31)
+a1baa28	0.357791	0.874126	discard	XGBRegressor intra (n=2000, d=5, lr=0.01)
+13690b2	0.332286	0.889277	keep	Add deeper lags (lag3,lag4) + day_of_week gap
+8c1d4e6	0.331451	0.889277	keep	Add deeper lags + day_of_week intra model
+c350c59	0.334946	0.885781	discard	Add month + gap_val_pred cross-model
+1f8da57	0.336236	0.875291	discard	HistGradientBoostingClassifier gap (iter=800, d=4)
+49d1cda	0.333264	0.879953	discard	XGB clf n=800 min_child_weight=3
+be38634	0.332523	0.889277	discard	XGB gap reg n=3000 lr=0.008 colsample=0.7
+4b43ef1	0.332230	0.888112	discard	XGB clf n=1000 lr=0.015
+b9fb607	0.306232	0.921911	keep	Add EMA5 EMA10 EMA_spread gap model
+7217833	0.274019	0.921911	keep	Add EMA features intraday model
+a793ec3	0.192897	0.945221	keep	Add EMA20 EMA spreads Intra EMA both models
+3f7bded	0.185970	0.955711	keep	Add EMA3 EMA30 spreads NetOI_EMA Intra_EMA10
+1b30f28	0.160195	0.955711	keep	Add TSM/SOX EMA + Gap EMA features
+2462c0c	0.154882	0.955711	keep	XGB gap reg depth=4 n=2500 reg_lambda=1
+fdbb5b6	0.154882	0.955711	keep	N_SPLITS=7 more CV folds
+812e298	0.154546	0.956876	keep	XGB clf n=800 depth=4 colsample=0.85
+e131035	0.153910	0.959207	keep	XGB clf n=1000 depth=5 lr=0.015
+9feeea6	0.154164	0.958042	discard	XGB clf n=1200 depth=6 lr=0.01
+84be99a	0.141426	0.972028	keep	Add Gap_EMA20, Gap EMA spread, NetOI_EMA10
+e1bf7ba	0.142102	0.972028	discard	Add Gap_EMA20 NetOI_EMA10 intraday
+2a99ed4	0.139696	0.972028	keep	Add TSM/SOX EMA10, EMA spread, Gap EWM vol
+bad1505	0.143970	0.969697	discard	Add TX EWM vol features gap
+c9d3201	0.140504	0.969697	discard	XGB clf subsample=0.8
+b30c769	0.139649	0.972028	keep	XGB gap reg n=3000
+8d2d3f7	0.135221	0.972028	keep	Add Intra_EMA20, Intra EMA spread
+d590517	0.160387	0.955711	discard	Add gap_val_pred cross-model intraday
+d429cba	0.134413	0.972028	keep	Add TSM/SOX EMA10 + IntraPoint EMA5 intraday
+b1df07f	0.145731	0.972028	discard	ExtraTrees intra n=1000 max_features=sqrt
+74372a9	0.116864	0.972028	keep	Add Intra_EMA3 + EMA3_EMA10 spread
+ee162ee	0.116316	0.972028	keep	Add Intra_EMA30 + EMA10_EMA30 spread
+cda3155	0.116941	0.972028	discard	Add IntraPoint_EMA10, EMA20
+3870678	0.117112	0.973193	discard	Add RSI_Mom5 + TSM/SOX MACD-like features
+4a8f074	0.119896	0.969697	discard	Add NetOI_Accel, Vol_Regime, EMA crossover binary
+0484582	0.116316	0.972028	discard	N_SPLITS=8 (no val change)
+c1405c1	0.116769	0.972028	discard	XGB gap reg n=5000 lr=0.008 tree_method=hist
+d85d18a	0.130363	0.972028	discard	XGBRegressor intraday n=3000 d=4 lr=0.005
+b49612e	0.137843	0.972028	discard	LGBMRegressor gap n=3000 leaves=31 d=5
+42f06fe	0.128183	0.972028	discard	XGB gap reg d=3 reg_alpha=0.5 reg_lambda=2
+09d8804	0.120515	0.972028	discard	XGB gap reg n=4000 d=5 lr=0.008
+be18351	0.141988	0.972028	discard	XGB gap reg Huber loss slope=10
+e18fd8d	0.116840	0.972028	discard	ExtraTrees intra n=1500 max_features=0.8
+36a32f8	0.116254	0.972028	keep	ExtraTrees intra min_split=3 min_leaf=2
+c7089f2	0.116479	0.972028	discard	ExtraTrees intra min_split=2 min_leaf=1
+638d655	0.116180	0.972028	keep	ExtraTrees intra n=1000 min_split=3 min_leaf=2
+25a94fd	0.116164	0.972028	keep	ExtraTrees intra n=2000 min_split=3 min_leaf=2
+5397467	0.116223	0.972028	discard	ExtraTrees intra n=3000
+fc60e4e	0.117225	0.968531	discard	XGB clf n=1200 lr=0.012 subsample=0.75 min_child=2
+4402657	0.116148	0.972028	keep	Add NetOI_EMA10 Gap_EMA20 Gap EMA spread intraday
+496a1ce	0.116212	0.972028	discard	Add Intra_Vol10 Gap_EWM_Vol5 intraday
+b67a14d	0.116072	0.972028	keep	Add TSM_SOX_EMA_Spread intraday
+431a6b6	0.116353	0.972028	discard	Add Open_Gap_lag2 NetOI_lag3 intraday
+5391c79	0.117045	0.972028	discard	Add IntraPoint_EMA10 EMA spread intraday
+2de0808	0.115004	0.975524	keep	XGB clf n=1500 lr=0.01
+401c17c	0.115003	0.975524	keep	XGB clf n=2000 lr=0.008
+86e3599	0.115713	0.973193	discard	XGB clf n=3000 lr=0.005
+1f9f304	0.115724	0.973193	discard	XGB clf depth=4 n=2000 lr=0.008
+e13c77a	0.115013	0.975524	discard	XGB clf depth=6 n=2000 lr=0.008
+22e0ebd	0.114915	0.975524	keep	XGB gap reg colsample=0.7 subsample=0.75
+33854db	0.116270	0.975524	discard	XGB gap reg colsample=0.6 subsample=0.7
+dc46959	0.119305	0.975524	discard	XGB gap reg min_child_weight=3
+b591a1d	0.114562	0.976690	keep	XGB clf colsample=0.8
+3649f0a	0.115609	0.973193	discard	XGB clf colsample=0.75
+c31a6e5	0.114418	0.976690	keep	XGB gap reg n=3500 lr=0.008
+222025e	0.115880	0.976690	discard	XGB gap reg n=4000 lr=0.006
+4968714	0.117010	0.976690	discard	XGB gap reg alpha=0.05 lambda=0.5
+cf9c313	0.115138	0.974359	discard	XGB clf alpha=0.05 lambda=0.5
+356c25f	0.115832	0.972028	discard	XGB clf subsample=0.75
+8746bdf	0.119351	0.972028	discard	Add Sent_TSM Sent_SOX Sent_EMA5 gap
+a983683	0.126137	0.975524	discard	XGB gap reg objective=reg:absoluteerror
+5900181	0.114435	0.976690	discard	Add gap_val_pred cross-model intraday
+b41817e	0.114605	0.976690	discard	Add Open_Gap_5d_mean NetOI_5d_mean intraday
