@@ -121,6 +121,9 @@ def engineer_features(df):
     # Non-linear gap effect
     X_intra['Open_Gap_sq'] = df['Open_Gap'] ** 2
     X_intra['Open_Gap_abs'] = df['Open_Gap'].abs()
+    # Intraday volatility and range features
+    X_intra['Intra_Vol5'] = df['Intraday_Ret'].rolling(5).std()
+    X_intra['Intra_Mean5'] = df['Intraday_Ret'].rolling(5).mean()
     # Intraday point info (lag)
     X_intra['Intra_Point_lag1'] = df['Intraday_Point'].shift(1)
     X_intra['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
