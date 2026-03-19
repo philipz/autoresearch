@@ -92,6 +92,10 @@ def engineer_features(df):
         X_gap['day_of_week'] = df.index.dayofweek
     else:
         X_gap['day_of_week'] = pd.to_datetime(df.index).dayofweek
+    # EMA features
+    X_gap['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
+    X_gap['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
+    X_gap['EMA5_EMA10_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA10']
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
