@@ -71,6 +71,9 @@ def engineer_features(df):
     X_gap['TX_Mom10'] = df['TX_Ret'].rolling(10).sum()
     # Institutional flow
     X_gap['NetOI_Diff'] = df['NetOI_Diff']
+    # Lagged gap and intraday info
+    X_gap['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
+    X_gap['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
