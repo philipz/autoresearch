@@ -19,6 +19,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, ExtraTreesRegressor
+import xgboost as xgb
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import (
     roc_auc_score,
@@ -125,15 +126,20 @@ def engineer_features(df):
 # B. Model Definition & Hyperparameters (AI: feel free to modify)
 # ---------------------------------------------------------------------------
 
-# Gap Direction Classifier (GradientBoosting for better AUC)
+# Gap Direction Classifier (XGBoost)
 GAP_CLF_PARAMS = dict(
     n_estimators=500,
     max_depth=3,
     learning_rate=0.02,
     subsample=0.7,
-    min_samples_split=5,
+    colsample_bytree=0.8,
+    reg_alpha=0.1,
+    reg_lambda=1.0,
     random_state=RANDOM_SEED,
+    use_label_encoder=False,
+    eval_metric='logloss',
 )
+USE_XGB_CLF = True
 
 # Gap Value Regressor
 GAP_REG_PARAMS = dict(
@@ -188,7 +194,7 @@ def train_and_evaluate_cv(train_df, val_df):
 
     for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_gap_train)):
         # Gap Classifier
-        clf = GradientBoostingClassifier(**GAP_CLF_PARAMS)
+        clf = xgb.XGBClassifier(**GAP_CLF_PARAMS) if USE_XGB_CLF else GradientBoostingClassifier(**GAP_CLF_PARAMS)
         clf.fit(X_gap_train.iloc[tr_idx], y_gap_dir_train.iloc[tr_idx])
         probs = clf.predict_proba(X_gap_train.iloc[te_idx])
         if probs.shape[1] == 2:
@@ -224,7 +230,7 @@ def train_and_evaluate_cv(train_df, val_df):
     # --- Final models trained on full training set ---
     print("\nTraining final models on full training set...")
 
-    gap_clf = GradientBoostingClassifier(**GAP_CLF_PARAMS)
+    gap_clf = xgb.XGBClassifier(**GAP_CLF_PARAMS) if USE_XGB_CLF else GradientBoostingClassifier(**GAP_CLF_PARAMS)
     gap_clf.fit(X_gap_train, y_gap_dir_train)
 
     gap_reg = ExtraTreesRegressor(**GAP_REG_PARAMS)
