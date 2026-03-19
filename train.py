@@ -134,6 +134,10 @@ def engineer_features(df):
         X_gap['Sentiment_Conf'] = df['Sentiment_Conf']
         # Interaction: sentiment amplified by momentum
         X_gap['Sent_Mom'] = df['Sentiment_Score'] * X_gap['TX_Mom5'].fillna(0)
+    # MACD features
+    X_gap['TSM_MACD'] = X_gap['TSM_EMA5'] - X_gap['TSM_EMA10']
+    X_gap['SOX_MACD'] = X_gap['SOX_EMA5'] - X_gap['SOX_EMA10']
+    X_gap['TX_MACD'] = X_gap['TX_EMA5'] - X_gap['TX_EMA20']
     # Additional gap lags and rolling
     X_gap['Open_Gap_lag3'] = df['Open_Gap'].shift(3)
     X_gap['Open_Gap_lag4'] = df['Open_Gap'].shift(4)
