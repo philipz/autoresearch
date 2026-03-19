@@ -107,6 +107,14 @@ def engineer_features(df):
     X_gap['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
     # NetOI EMA
     X_gap['NetOI_EMA5'] = df['NetOI_Diff'].ewm(span=5).mean()
+    # TSM/SOX EMA
+    X_gap['TSM_EMA5'] = df['TSM_Ret'].ewm(span=5).mean()
+    X_gap['SOX_EMA5'] = df['SOX_Ret'].ewm(span=5).mean()
+    X_gap['TSM_EMA10'] = df['TSM_Ret'].ewm(span=10).mean()
+    X_gap['SOX_EMA10'] = df['SOX_Ret'].ewm(span=10).mean()
+    # Open_Gap EMA
+    X_gap['Gap_EMA5'] = df['Open_Gap'].ewm(span=5).mean()
+    X_gap['Gap_EMA10'] = df['Open_Gap'].ewm(span=10).mean()
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
@@ -166,6 +174,12 @@ def engineer_features(df):
     X_intra['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
     X_intra['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
     X_intra['NetOI_EMA5'] = df['NetOI_Diff'].ewm(span=5).mean()
+    # TSM/SOX EMA for intraday
+    X_intra['TSM_EMA5'] = df['TSM_Ret'].ewm(span=5).mean()
+    X_intra['SOX_EMA5'] = df['SOX_Ret'].ewm(span=5).mean()
+    # Gap EMA for intraday
+    X_intra['Gap_EMA5'] = df['Open_Gap'].ewm(span=5).mean()
+    X_intra['Gap_EMA10'] = df['Open_Gap'].ewm(span=10).mean()
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
