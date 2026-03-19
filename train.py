@@ -109,9 +109,9 @@ def engineer_features(df):
 
 # Gap Direction Classifier (GradientBoosting for better AUC)
 GAP_CLF_PARAMS = dict(
-    n_estimators=300,
+    n_estimators=500,
     max_depth=3,
-    learning_rate=0.03,
+    learning_rate=0.02,
     subsample=0.8,
     min_samples_split=10,
     random_state=RANDOM_SEED,
