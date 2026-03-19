@@ -260,7 +260,7 @@ USE_XGB_REG = True
 
 # Intraday Return Regressor
 INTRA_REG_PARAMS = dict(
-    n_estimators=700,
+    n_estimators=1000,
     max_depth=None,
     min_samples_split=3,
     min_samples_leaf=2,
