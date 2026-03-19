@@ -75,3 +75,4 @@ cf9c313	0.115138	0.974359	discard	XGB clf alpha=0.05 lambda=0.5
 a983683	0.126137	0.975524	discard	XGB gap reg objective=reg:absoluteerror
 5900181	0.114435	0.976690	discard	Add gap_val_pred cross-model intraday
 b41817e	0.114605	0.976690	discard	Add Open_Gap_5d_mean NetOI_5d_mean intraday
+00947c6	0.114373	0.976690	keep	XGB gap reg gamma=0.1
