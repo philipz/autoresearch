@@ -55,6 +55,8 @@ FEATURE_COLS = [
     'MA5',              # 5-day simple moving average
     'MA20',             # 20-day simple moving average
     'RSI',              # 14-day RSI
+    'Sentiment_Score',  # 國際新聞 LLM 情緒分數（T-1，Gemini API）-1=熊 0=中性 +1=牛
+    'Sentiment_Conf',   # LLM 分析信心度（T-1）0~1
 ]
 
 # Target columns
@@ -67,6 +69,7 @@ TARGET_COLS = {
 # Cache file for prepared data
 CACHE_DIR = os.path.join(os.path.dirname(__file__), '.cache')
 CACHE_FILE = os.path.join(CACHE_DIR, 'prepared_data.csv')
+SENTIMENT_CACHE_FILE = os.path.join(CACHE_DIR, 'sentiment_cache.csv')
 
 # ---------------------------------------------------------------------------
 # Data preparation (fetches and caches)
@@ -117,6 +120,38 @@ def _load_cached():
     return pd.read_csv(CACHE_FILE, index_col=0, parse_dates=False)
 
 
+def _merge_sentiment(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Left-join sentiment_cache.csv onto the main dataframe by date index.
+    Missing dates get Sentiment_Score=0.0, Sentiment_Conf=0.0 (neutral).
+    Sentiment is treated as T-1: today's features use yesterday's news sentiment,
+    so we shift by 1 row to avoid look-ahead bias.
+    """
+    if not os.path.exists(SENTIMENT_CACHE_FILE):
+        print("WARNING: sentiment_cache.csv not found. Run fetch_sentiment.py first.")
+        print("         Filling Sentiment_Score and Sentiment_Conf with 0.0 (neutral).")
+        df = df.copy()
+        df['Sentiment_Score'] = 0.0
+        df['Sentiment_Conf'] = 0.0
+        return df
+
+    sent = pd.read_csv(SENTIMENT_CACHE_FILE)
+    sent = sent[['date', 'sentiment_score', 'sentiment_conf']].copy()
+    sent.columns = ['date', 'Sentiment_Score', 'Sentiment_Conf']
+    sent = sent.set_index('date')
+
+    # Shift by 1 day (T-1): today's ML prediction uses yesterday's sentiment
+    df = df.copy()
+    df['Sentiment_Score'] = sent['Sentiment_Score'].reindex(df.index).shift(1).values
+    df['Sentiment_Conf'] = sent['Sentiment_Conf'].reindex(df.index).shift(1).values
+
+    # Fill missing with neutral
+    df['Sentiment_Score'] = df['Sentiment_Score'].fillna(0.0)
+    df['Sentiment_Conf'] = df['Sentiment_Conf'].fillna(0.0)
+
+    return df
+
+
 # ---------------------------------------------------------------------------
 # Runtime API (imported by train.py)
 # ---------------------------------------------------------------------------
@@ -137,6 +172,7 @@ def get_data():
         _fetch_and_prepare()
 
     df = _load_cached()
+    df = _merge_sentiment(df)
 
     # Strict time-series split
     n = len(df)
