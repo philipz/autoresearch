@@ -96,6 +96,10 @@ def engineer_features(df):
     X_gap['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
     X_gap['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
     X_gap['EMA5_EMA10_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA10']
+    X_gap['TX_EMA20'] = df['TX_Ret'].ewm(span=20).mean()
+    X_gap['EMA5_EMA20_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA20']
+    # Intraday EMA for gap model
+    X_gap['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
@@ -146,6 +150,10 @@ def engineer_features(df):
     X_intra['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
     X_intra['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
     X_intra['EMA5_EMA10_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA10']
+    X_intra['TX_EMA20'] = df['TX_Ret'].ewm(span=20).mean()
+    X_intra['EMA5_EMA20_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA20']
+    X_intra['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
+    X_intra['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
