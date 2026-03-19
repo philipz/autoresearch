@@ -18,7 +18,7 @@ import time
 import warnings
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import (
     roc_auc_score,
@@ -107,10 +107,12 @@ def engineer_features(df):
 # B. Model Definition & Hyperparameters (AI: feel free to modify)
 # ---------------------------------------------------------------------------
 
-# Gap Direction Classifier
+# Gap Direction Classifier (GradientBoosting for better AUC)
 GAP_CLF_PARAMS = dict(
-    n_estimators=300,
-    max_depth=5,
+    n_estimators=200,
+    max_depth=3,
+    learning_rate=0.05,
+    subsample=0.8,
     min_samples_split=10,
     random_state=RANDOM_SEED,
 )
@@ -168,7 +170,7 @@ def train_and_evaluate_cv(train_df, val_df):
 
     for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_gap_train)):
         # Gap Classifier
-        clf = RandomForestClassifier(**GAP_CLF_PARAMS)
+        clf = GradientBoostingClassifier(**GAP_CLF_PARAMS)
         clf.fit(X_gap_train.iloc[tr_idx], y_gap_dir_train.iloc[tr_idx])
         probs = clf.predict_proba(X_gap_train.iloc[te_idx])
         if probs.shape[1] == 2:
@@ -204,7 +206,7 @@ def train_and_evaluate_cv(train_df, val_df):
     # --- Final models trained on full training set ---
     print("\nTraining final models on full training set...")
 
-    gap_clf = RandomForestClassifier(**GAP_CLF_PARAMS)
+    gap_clf = GradientBoostingClassifier(**GAP_CLF_PARAMS)
     gap_clf.fit(X_gap_train, y_gap_dir_train)
 
     gap_reg = RandomForestRegressor(**GAP_REG_PARAMS)
