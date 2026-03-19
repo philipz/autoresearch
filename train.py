@@ -90,6 +90,8 @@ def engineer_features(df):
     X_intra['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     X_intra['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_intra['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    X_intra['TX_Vol10'] = df['TX_Ret'].rolling(10).std()
+    X_intra['TX_Mom10'] = df['TX_Ret'].rolling(10).sum()
     # Technical indicators
     X_intra['RSI'] = df['RSI']
     X_intra['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
