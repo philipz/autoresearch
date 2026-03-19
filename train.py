@@ -226,12 +226,13 @@ USE_XGB_CLF = True
 
 # Gap Value Regressor (XGBRegressor)
 GAP_REG_PARAMS = dict(
-    n_estimators=2000,
-    max_depth=5,
+    n_estimators=2500,
+    max_depth=4,
     learning_rate=0.01,
     subsample=0.8,
     colsample_bytree=0.8,
     reg_alpha=0.1,
+    reg_lambda=1.0,
     random_state=RANDOM_SEED,
 )
 USE_XGB_REG = True
