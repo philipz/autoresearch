@@ -83,6 +83,12 @@ def engineer_features(df):
     X_intra['Intra_Ret_lag1'] = df['Intraday_Ret'].shift(1)
     X_intra['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_intra['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    # Technical indicators
+    X_intra['RSI'] = df['RSI']
+    X_intra['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
+    # US market signals
+    X_intra['TSM_Ret'] = df['TSM_Ret']
+    X_intra['SOX_Ret'] = df['SOX_Ret']
     # Sentiment features (T-1, pre-shifted in prepare.py)
     if 'Sentiment_Score' in df.columns:
         X_intra['Sentiment_Score'] = df['Sentiment_Score']
