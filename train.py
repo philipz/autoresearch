@@ -246,7 +246,7 @@ INTRA_REG_PARAMS = dict(
 )
 
 # Cross-validation
-N_SPLITS = 5  # TimeSeriesSplit folds
+N_SPLITS = 7  # TimeSeriesSplit folds
 
 
 # ---------------------------------------------------------------------------
