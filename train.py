@@ -138,6 +138,15 @@ def engineer_features(df):
     # Intraday point info (lag)
     X_intra['Intra_Point_lag1'] = df['Intraday_Point'].shift(1)
     X_intra['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
+    # Deeper lags for intraday
+    X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
+    X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
+    X_intra['Intra_Ret_lag3'] = df['Intraday_Ret'].shift(3)
+    # Day of week seasonality
+    if hasattr(df.index, 'dayofweek'):
+        X_intra['day_of_week'] = df.index.dayofweek
+    else:
+        X_intra['day_of_week'] = pd.to_datetime(df.index).dayofweek
     X_intra.fillna(0, inplace=True)
 
     # --- Targets ---
