@@ -211,9 +211,9 @@ def engineer_features(df):
 
 # Gap Direction Classifier (XGBoost)
 GAP_CLF_PARAMS = dict(
-    n_estimators=800,
-    max_depth=4,
-    learning_rate=0.02,
+    n_estimators=1000,
+    max_depth=5,
+    learning_rate=0.015,
     subsample=0.7,
     colsample_bytree=0.85,
     reg_alpha=0.1,
