@@ -78,3 +78,4 @@ b41817e	0.114605	0.976690	discard	Add Open_Gap_5d_mean NetOI_5d_mean intraday
 00947c6	0.114373	0.976690	keep	XGB gap reg gamma=0.1
 fd0447e	0.114319	0.976690	keep	XGB gap reg gamma=0.2
 506d8a6	0.114321	0.976690	discard	XGB gap reg gamma=0.5
+0b124f1	0.114332	0.976690	discard	XGB clf gamma=0.1

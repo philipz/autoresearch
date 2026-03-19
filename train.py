@@ -246,7 +246,6 @@ GAP_CLF_PARAMS = dict(
     colsample_bytree=0.8,
     reg_alpha=0.1,
     reg_lambda=1.0,
-    gamma=0.1,
     random_state=RANDOM_SEED,
     use_label_encoder=False,
     eval_metric='logloss',
