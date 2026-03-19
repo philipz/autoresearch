@@ -155,7 +155,7 @@ def test_live():
     print(f"\nFetching RSS headlines for {today}...")
     headlines = fetcher.fetch_rss_headlines(today)
     print(f"Got {len(headlines)} headlines")
-    for h in headlines[:5]:
+    for h in headlines:
         print(f"  - {h}")
 
     if not headlines:
