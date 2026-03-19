@@ -213,10 +213,16 @@ def train_and_evaluate_cv(train_df, val_df):
         mae = mean_absolute_error(y_gap_val_train.iloc[te_idx], preds)
         cv_gap_mae.append(mae)
 
-        # Intraday Regressor
+        # Intraday Regressor (with cross-model feature)
+        cv_gap_prob_tr = clf.predict_proba(X_gap_train.iloc[tr_idx])[:, 1]
+        cv_gap_prob_te = probs[:, 1] if probs.shape[1] == 2 else np.full(len(te_idx), 0.5)
+        X_intra_tr_aug = X_intra_train.iloc[tr_idx].copy()
+        X_intra_tr_aug['gap_up_prob'] = cv_gap_prob_tr
+        X_intra_te_aug = X_intra_train.iloc[te_idx].copy()
+        X_intra_te_aug['gap_up_prob'] = cv_gap_prob_te
         intra = ExtraTreesRegressor(**INTRA_REG_PARAMS)
-        intra.fit(X_intra_train.iloc[tr_idx], y_intra_train.iloc[tr_idx])
-        intra_preds = intra.predict(X_intra_train.iloc[te_idx])
+        intra.fit(X_intra_tr_aug, y_intra_train.iloc[tr_idx])
+        intra_preds = intra.predict(X_intra_te_aug)
         mse = mean_squared_error(y_intra_train.iloc[te_idx], intra_preds)
         cv_intra_mse.append(mse)
 
@@ -236,8 +242,13 @@ def train_and_evaluate_cv(train_df, val_df):
     gap_reg = ExtraTreesRegressor(**GAP_REG_PARAMS)
     gap_reg.fit(X_gap_train, y_gap_val_train)
 
+    # Cross-model feature: add gap_clf predicted probability to intraday features
+    gap_prob_train = gap_clf.predict_proba(X_gap_train)[:, 1]
+    X_intra_train_aug = X_intra_train.copy()
+    X_intra_train_aug['gap_up_prob'] = gap_prob_train
+
     intra_reg = ExtraTreesRegressor(**INTRA_REG_PARAMS)
-    intra_reg.fit(X_intra_train, y_intra_train)
+    intra_reg.fit(X_intra_train_aug, y_intra_train)
 
     # --- Validation set evaluation ---
     print("\nValidation set evaluation:")
@@ -264,8 +275,10 @@ def train_and_evaluate_cv(train_df, val_df):
     val_gap_mae = mean_absolute_error(y_gap_val_val, gap_val_preds)
     print(f"  Gap MAE:      {val_gap_mae:.2f} points")
 
-    # Intraday Regressor
-    intra_val_preds = intra_reg.predict(X_intra_val)
+    # Intraday Regressor (with cross-model feature)
+    X_intra_val_aug = X_intra_val.copy()
+    X_intra_val_aug['gap_up_prob'] = gap_probs[:, 1]
+    intra_val_preds = intra_reg.predict(X_intra_val_aug)
     val_intra_mse = mean_squared_error(y_intra_val, intra_val_preds)
     val_intra_mae = mean_absolute_error(y_intra_val, intra_val_preds)
     print(f"  Intra MSE:    {val_intra_mse:.8f}")
