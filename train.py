@@ -67,6 +67,9 @@ def engineer_features(df):
     X_gap['TSM_SOX_Spread'] = X_gap['TSM_Ret'] - X_gap['SOX_Ret']
     X_gap['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_gap['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    # Technical indicators for gap model
+    X_gap['RSI'] = df['RSI']
+    X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
     # Sentiment features (T-1, pre-shifted in prepare.py)
     if 'Sentiment_Score' in df.columns:
         X_gap['Sentiment_Score'] = df['Sentiment_Score']
