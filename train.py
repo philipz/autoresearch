@@ -128,17 +128,17 @@ GAP_CLF_PARAMS = dict(
 
 # Gap Value Regressor
 GAP_REG_PARAMS = dict(
-    n_estimators=300,
-    max_depth=5,
-    min_samples_split=10,
+    n_estimators=500,
+    max_depth=7,
+    min_samples_split=5,
     random_state=RANDOM_SEED,
 )
 
 # Intraday Return Regressor
 INTRA_REG_PARAMS = dict(
-    n_estimators=300,
-    max_depth=5,
-    min_samples_split=10,
+    n_estimators=500,
+    max_depth=7,
+    min_samples_split=5,
     random_state=RANDOM_SEED,
 )
 
