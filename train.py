@@ -93,13 +93,20 @@ def engineer_features(df):
     else:
         X_gap['day_of_week'] = pd.to_datetime(df.index).dayofweek
     # EMA features
+    X_gap['TX_EMA3'] = df['TX_Ret'].ewm(span=3).mean()
     X_gap['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
     X_gap['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
-    X_gap['EMA5_EMA10_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA10']
     X_gap['TX_EMA20'] = df['TX_Ret'].ewm(span=20).mean()
+    X_gap['TX_EMA30'] = df['TX_Ret'].ewm(span=30).mean()
+    X_gap['EMA3_EMA10_Spread'] = X_gap['TX_EMA3'] - X_gap['TX_EMA10']
+    X_gap['EMA5_EMA10_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA10']
     X_gap['EMA5_EMA20_Spread'] = X_gap['TX_EMA5'] - X_gap['TX_EMA20']
+    X_gap['EMA10_EMA30_Spread'] = X_gap['TX_EMA10'] - X_gap['TX_EMA30']
     # Intraday EMA for gap model
     X_gap['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
+    X_gap['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
+    # NetOI EMA
+    X_gap['NetOI_EMA5'] = df['NetOI_Diff'].ewm(span=5).mean()
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
@@ -147,13 +154,18 @@ def engineer_features(df):
     X_intra['Intra_Point_lag1'] = df['Intraday_Point'].shift(1)
     X_intra['Open_Gap_lag1'] = df['Open_Gap'].shift(1)
     # EMA features for intraday
+    X_intra['TX_EMA3'] = df['TX_Ret'].ewm(span=3).mean()
     X_intra['TX_EMA5'] = df['TX_Ret'].ewm(span=5).mean()
     X_intra['TX_EMA10'] = df['TX_Ret'].ewm(span=10).mean()
-    X_intra['EMA5_EMA10_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA10']
     X_intra['TX_EMA20'] = df['TX_Ret'].ewm(span=20).mean()
+    X_intra['TX_EMA30'] = df['TX_Ret'].ewm(span=30).mean()
+    X_intra['EMA3_EMA10_Spread'] = X_intra['TX_EMA3'] - X_intra['TX_EMA10']
+    X_intra['EMA5_EMA10_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA10']
     X_intra['EMA5_EMA20_Spread'] = X_intra['TX_EMA5'] - X_intra['TX_EMA20']
+    X_intra['EMA10_EMA30_Spread'] = X_intra['TX_EMA10'] - X_intra['TX_EMA30']
     X_intra['Intra_EMA5'] = df['Intraday_Ret'].ewm(span=5).mean()
     X_intra['Intra_EMA10'] = df['Intraday_Ret'].ewm(span=10).mean()
+    X_intra['NetOI_EMA5'] = df['NetOI_Diff'].ewm(span=5).mean()
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
