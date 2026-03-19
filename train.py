@@ -206,6 +206,8 @@ def engineer_features(df):
     # Gap EMA 20 for intraday
     X_intra['Gap_EMA20'] = df['Open_Gap'].ewm(span=20).mean()
     X_intra['Gap_EMA5_EMA20_Spread'] = X_intra['Gap_EMA5'] - X_intra['Gap_EMA20']
+    # TSM/SOX EMA spread
+    X_intra['TSM_SOX_EMA_Spread'] = X_intra['TSM_EMA5'] - X_intra['SOX_EMA5']
     # Deeper lags for intraday
     X_intra['TX_Ret_lag3'] = df['TX_Ret'].shift(3)
     X_intra['TX_Ret_lag4'] = df['TX_Ret'].shift(4)
