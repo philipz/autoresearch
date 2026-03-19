@@ -48,6 +48,7 @@ Each experiment runs on CPU (macOS, no GPU). The training script has a **fixed t
 - Modify `prepare.py`. It is read-only. It contains the fixed data pipeline, data splits, and constants.
 - Install new packages or add dependencies beyond what's in `requirements.txt`.
 - Access the test set during training. The test set is reserved for final human evaluation.
+- Import `feedparser` or `google.generativeai` directly in `train.py` — sentiment data is already pre-computed as `Sentiment_Score` / `Sentiment_Conf` columns via `prepare.py`. Those packages belong to the data pipeline, not the model layer.
 
 **The goal is simple: get the lowest `composite_score`.** Since the data is small, training is fast. Use the extra time budget for thorough cross-validation and feature exploration.
 
@@ -64,6 +65,8 @@ Each experiment runs on CPU (macOS, no GPU). The training script has a **fixed t
 | `MA5` | 5-day simple moving average | Computed |
 | `MA20` | 20-day simple moving average | Computed |
 | `RSI` | 14-day RSI | Computed |
+| `Sentiment_Score` | 國際財金新聞 LLM 情緒分數（T-1），-1=熊市 0=中性 +1=牛市 | Gemini API (Reuters/Yahoo RSS) |
+| `Sentiment_Conf`  | LLM 分析信心度（T-1），0~1 | Gemini API |
 
 > **CAUTION**: When engineering features for prediction models, be careful about **data leakage**. Do NOT use same-day `Intraday_Ret`, `Intraday_Point`, or `TX_Ret` as features for gap prediction (they are targets or future information). Only use **T-1 or earlier** data as predictive features.
 
@@ -136,6 +139,9 @@ Here are promising avenues, roughly ordered by expected impact:
 - **Lagged features**: Add `TSM_Ret_lag2`, `SOX_Ret_lag2` (2-day lookback)
 - **Rolling statistics**: 5-day, 10-day rolling mean/std of returns
 - **Cross-model features**: Use gap prediction as input feature for intraday model
+- **Sentiment weighting**: When `|Sentiment_Score| > 0.5`, amplify its weight via `X_gap['Sentiment_Boost'] = df['Sentiment_Score'] * (abs(df['Sentiment_Score']) > 0.5).astype(int)`
+- **Sentiment × technical interaction**: `Sentiment_Score * TSM_Ret`, `Sentiment_Score * SOX_Ret` to capture news amplification of price momentum
+- **Confidence filter**: Use `Sentiment_Conf` as a scaling weight — low-confidence news should have less influence on predictions
 
 ### Medium Priority
 - **Model ensembles**: Combine GradientBoosting + RandomForest predictions
