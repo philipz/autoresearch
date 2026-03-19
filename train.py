@@ -67,6 +67,10 @@ def engineer_features(df):
     X_gap['TSM_SOX_Spread'] = X_gap['TSM_Ret'] - X_gap['SOX_Ret']
     X_gap['TX_Vol5'] = df['TX_Ret'].rolling(5).std()
     X_gap['TX_Mom5'] = df['TX_Ret'].rolling(5).sum()
+    X_gap['TX_Vol10'] = df['TX_Ret'].rolling(10).std()
+    X_gap['TX_Mom10'] = df['TX_Ret'].rolling(10).sum()
+    # Institutional flow
+    X_gap['NetOI_Diff'] = df['NetOI_Diff']
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
