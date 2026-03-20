@@ -128,12 +128,6 @@ def engineer_features(df):
     # Technical indicators for gap model
     X_gap['RSI'] = df['RSI']
     X_gap['MA5_MA20_Spread'] = df['MA5'] - df['MA20']
-    # Sentiment features (T-1, pre-shifted in prepare.py)
-    if 'Sentiment_Score' in df.columns:
-        X_gap['Sentiment_Score'] = df['Sentiment_Score']
-        X_gap['Sentiment_Conf'] = df['Sentiment_Conf']
-        # Interaction: sentiment amplified by momentum
-        X_gap['Sent_Mom'] = df['Sentiment_Score'] * X_gap['TX_Mom5'].fillna(0)
     X_gap.fillna(0, inplace=True) # Fill initial lag NAs
 
     # --- Intraday model features ---
@@ -155,10 +149,6 @@ def engineer_features(df):
     # US market signals
     X_intra['TSM_Ret'] = df['TSM_Ret']
     X_intra['SOX_Ret'] = df['SOX_Ret']
-    # Sentiment features (T-1, pre-shifted in prepare.py)
-    if 'Sentiment_Score' in df.columns:
-        X_intra['Sentiment_Score'] = df['Sentiment_Score']
-        X_intra['Sentiment_Conf'] = df['Sentiment_Conf']
     # 20-day rolling stats
     X_intra['TX_Vol20'] = df['TX_Ret'].rolling(20).std()
     X_intra['TX_Mom20'] = df['TX_Ret'].rolling(20).sum()
