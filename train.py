@@ -254,14 +254,14 @@ USE_XGB_CLF = True
 
 # Gap Value Regressor (XGBRegressor)
 GAP_REG_PARAMS = dict(
-    n_estimators=3500,
+    n_estimators=6000,
     max_depth=4,
     learning_rate=0.008,
     subsample=0.75,
     colsample_bytree=0.7,
     reg_alpha=0.1,
-    reg_lambda=1.0,
-    gamma=0.2,
+    reg_lambda=2.4,
+    gamma=0.5,
     random_state=RANDOM_SEED,
 )
 USE_XGB_REG = True
@@ -324,9 +324,11 @@ def train_and_evaluate_cv(train_df, val_df):
             auc = 0.5
         cv_gap_auc.append(auc)
 
-        # Gap Regressor
-        reg = xgb.XGBRegressor(**GAP_REG_PARAMS) if USE_XGB_REG else ExtraTreesRegressor(**GAP_REG_PARAMS)
-        reg.fit(X_gap_train.iloc[tr_idx], y_gap_val_train.iloc[tr_idx])
+        # Gap Regressor (with early stopping)
+        reg = xgb.XGBRegressor(**GAP_REG_PARAMS, early_stopping_rounds=100)
+        reg.fit(X_gap_train.iloc[tr_idx], y_gap_val_train.iloc[tr_idx],
+                eval_set=[(X_gap_train.iloc[te_idx], y_gap_val_train.iloc[te_idx])],
+                verbose=False)
         preds = reg.predict(X_gap_train.iloc[te_idx])
         mae = mean_absolute_error(y_gap_val_train.iloc[te_idx], preds)
         cv_gap_mae.append(mae)
@@ -357,7 +359,7 @@ def train_and_evaluate_cv(train_df, val_df):
     gap_clf = xgb.XGBClassifier(**GAP_CLF_PARAMS) if USE_XGB_CLF else GradientBoostingClassifier(**GAP_CLF_PARAMS)
     gap_clf.fit(X_gap_train, y_gap_dir_train)
 
-    gap_reg = xgb.XGBRegressor(**GAP_REG_PARAMS) if USE_XGB_REG else ExtraTreesRegressor(**GAP_REG_PARAMS)
+    gap_reg = xgb.XGBRegressor(**GAP_REG_PARAMS)
     gap_reg.fit(X_gap_train, y_gap_val_train)
 
     # Cross-model feature: add gap_clf predicted probability to intraday features
