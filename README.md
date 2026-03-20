@@ -52,11 +52,64 @@ The `program.md` file is essentially a super lightweight "skill".
 ## Project structure
 
 ```
-prepare.py      — constants, data prep + runtime utilities (do not modify)
-train.py        — model, optimizer, training loop (agent modifies this)
-program.md      — agent instructions
-pyproject.toml  — dependencies
+prepare.py          — constants, data prep + runtime utilities (do not modify)
+train.py            — model, optimizer, training loop (agent modifies this)
+program.md          — agent instructions
+fetch_sentiment.py  — daily sentiment signal tool (run manually, independent of ML)
+pyproject.toml      — dependencies
 ```
+
+## Sentiment module (independent signal)
+
+The ML model (`train.py`) uses only historical price/volume data. International financial news sentiment runs as a **separate, standalone tool** — not mixed into the model. This separation is intentional: historical RSS data is unavailable, so sentiment is only meaningful for recent/current days.
+
+**Setup** — set your Gemini API key once:
+
+```bash
+export GEMINI_API_KEY="your-key-here"
+```
+
+**Test the connection** (fetches today's headlines + calls Gemini, no cache write):
+
+```bash
+cd autoresearch_sandbox
+python fetch_sentiment.py --test
+```
+
+Example output:
+
+```
+Fetching RSS headlines for 2026-03-20...
+Got 28 headlines
+  - Fed holds rates steady amid tariff uncertainty
+  - TSMC reports record Q1 revenue, beats estimates
+  ...
+
+Result:
+  score:      +0.420  (-1=bearish, +1=bullish for TX)
+  confidence: 0.780
+  key_events: ['TSMC record revenue', 'Fed rate hold', 'SOX index up 1.2%']
+```
+
+**Daily pre-market update** (recommended before 8:45 AM Taiwan time):
+
+```bash
+python fetch_sentiment.py
+```
+
+This writes results to `.cache/sentiment_cache.csv`. Historical dates (>2 days ago) are auto-filled with neutral `score=0.0` — no API calls made for those.
+
+**Interpreting the signal:**
+
+| Score range | Interpretation for TX next session |
+|---|---|
+| > +0.5 | Bullish bias — consider long position |
+| +0.2 to +0.5 | Mildly bullish |
+| -0.2 to +0.2 | Neutral — rely on technical signals |
+| -0.5 to -0.2 | Mildly bearish |
+| < -0.5 | Bearish bias — consider short or stand aside |
+
+Use `confidence` as a filter: if `confidence < 0.4`, treat the signal as neutral regardless of score.
 
 ## Design choices
 
