@@ -211,14 +211,13 @@ def engineer_features(df):
 
 # Direction Classifier (LightGBM)
 DIR_CLF_PARAMS = dict(
-    n_estimators=3000,
-    max_depth=6,
-    num_leaves=63,
-    learning_rate=0.003,
-    subsample=0.75,
-    colsample_bytree=0.75,
-    min_child_samples=30,
-    reg_alpha=3.0,
+    n_estimators=2000,
+    max_depth=8,
+    num_leaves=255,
+    learning_rate=0.005,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    reg_alpha=2.0,
     reg_lambda=15.0,
     bagging_freq=5,
     bagging_fraction=0.7,
@@ -228,14 +227,13 @@ DIR_CLF_PARAMS = dict(
 
 # Remaining Points Regressor (LightGBM)
 PTS_REG_PARAMS = dict(
-    n_estimators=3000,
-    max_depth=6,
-    num_leaves=63,
-    learning_rate=0.003,
-    subsample=0.75,
-    colsample_bytree=0.75,
-    min_child_samples=30,
-    reg_alpha=3.0,
+    n_estimators=2000,
+    max_depth=8,
+    num_leaves=255,
+    learning_rate=0.005,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    reg_alpha=2.0,
     reg_lambda=15.0,
     bagging_freq=5,
     bagging_fraction=0.7,
