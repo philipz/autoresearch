@@ -1,0 +1,16 @@
+experiment	composite_score	val_dir_auc	status	description
+baseline	0.213279	0.871139	keep	Baseline XGBoost clf+reg with 10 dynamic + 7 static features
+exp10.1980210.894686keepAdd VWAP×RangePos Mom×Time interactions + Open_Gap_sq + n_est=1500
+exp20.0803860.989001keepn_est=2000 lr=0.008 + Sentiment_Conf + prev Intraday_Ret
+exp30.0000000.0crashreg n=1500 lr=0.008 N_SPLITS=7 (KeyboardInterrupt)
+exp40.0788090.988921keepreg n=1500 lr=0.008 + TSM_SOX_Spread + Gap_x_TSM
+exp50.0000000.0crashclf depth=6 + Intraday_Point + VWAP_Dist_abs (KeyboardInterrupt)
+exp60.0000000.0crashn=1000 + Intraday_Point VWAP_abs Ret_x_VWAP (KeyboardInterrupt)
+exp70.0906310.977782discardn=300 lr=0.03 N_SPLITS=3 + Intraday_Point VWAP_abs Ret_x_VWAP VolRatio_x_Time
+exp80.0878270.979420discardn=500 lr=0.02 N_SPLITS=5 + new features (underpowered)
+exp90.0855780.979667discardn=800 lr=0.015 N_SPLITS=5 + new features
+exp100.0889090.977716discardn=1000 lr=0.01 + all new features
+exp110.0000000.0crashcomposite weight 70/30 (KeyboardInterrupt)
+exp120.0000000.0crashLightGBM n=2000 lr=0.008 (timeout at fold 1)
+exp130.0812780.988538discardLightGBM n=500 leaves=31 lr=0.03 N_SPLITS=3 (Acc=94.2%)
+exp140.0781900.992082keepLightGBM n=800 leaves=31 lr=0.02 N_SPLITS=5 (NEW BEST!)
