@@ -43,6 +43,7 @@ KBAR_5M_FILE = os.path.join(PROJECT_ROOT, 'data', 'raw', 'tx_5m_kbar.csv')
 DAILY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'prepared_data.csv')
 SENTIMENT_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'sentiment_cache.csv')
 INTRADAY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'intraday_snapshots.csv')
+OFI_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'ofi_features.csv')
 
 # Data split
 TRAIN_RATIO = 0.70
@@ -237,7 +238,23 @@ def build_intraday_dataset():
     # Keep only existing columns
     ordered = [c for c in ordered if c in result.columns]
     result = result[ordered]
-    
+
+    # --- 合併 OFI 特徵（若 cache 存在）---
+    if os.path.exists(OFI_CACHE_FILE):
+        print(f"合併 OFI 特徵從 {OFI_CACHE_FILE}...")
+        ofi = pd.read_csv(OFI_CACHE_FILE)
+        result = pd.merge(result, ofi, on=['TradingDate', 'Time'], how='left')
+        ofi_cols = ['OFI', 'Cum_OFI', 'Trade_Count', 'Avg_Trade_Size',
+                    'Large_Trade_Ratio', 'OFI_SMA3']
+        for col in ofi_cols:
+            if col in result.columns:
+                result[col] = result[col].fillna(0)
+        matched = (result['OFI'] != 0).sum()
+        print(f"OFI 合併完成，非零 rows: {matched}")
+        assert matched > 0, "OFI merge failed! Check ofi_features.csv TradingDate/Time format."
+    else:
+        print("WARNING: OFI cache 不存在，跳過 OFI 特徵。")
+
     return result
 
 

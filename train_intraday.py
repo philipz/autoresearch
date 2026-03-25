@@ -62,6 +62,13 @@ def engineer_features(df):
         Intraday_Ret (previous day), TX_Ret, MA5, MA20, RSI,
         Sentiment_Score, Sentiment_Conf
 
+    OFI features (if ofi_features.csv cache exists):
+        OFI               - Order Flow Imbalance per 5-min bar (tick rule)
+        Cum_OFI           - Cumulative OFI since open
+        Trade_Count       - Number of ticks per bar
+        Large_Trade_Ratio - Ratio of large trades (>= 10 lots)
+        OFI_SMA3          - 3-bar rolling mean OFI
+
     Returns:
         dict with keys:
             'X': feature matrix
@@ -185,6 +192,24 @@ def engineer_features(df):
 
     X['Near_High'] = (df['Range_Position'] > 0.85).astype(float)
     X['Near_Low']  = (df['Range_Position'] < 0.15).astype(float)
+
+    # --- Phase 2: OFI 逐筆流量特徵 ---
+    ofi_cols = ['OFI', 'Cum_OFI', 'Trade_Count', 'Avg_Trade_Size',
+                'Large_Trade_Ratio', 'OFI_SMA3']
+    for col in ofi_cols:
+        if col in df.columns:
+            X[col] = df[col]
+
+    # OFI 互動特徵（流量方向 × 時段）
+    if 'OFI' in df.columns:
+        # OFI_x_Time：收盤前的 OFI 信號更強（Time_Progress 越大，權重越高）
+        X['OFI_x_Time']      = df['OFI'] * df['Time_Progress']
+        X['Cum_OFI_x_Time']  = df['Cum_OFI'] * df['Time_Progress']
+        X['OFI_x_VWAP']      = df['OFI'] * df['VWAP_Dist']
+        X['OFI_Extreme']     = (np.abs(df['OFI']) > 0.5).astype(float)
+        X['OFI_x_Morning']   = df['OFI'] * (df['Time_Progress'] < 0.30)
+        X['OFI_x_Afternoon'] = df['OFI'] * (df['Time_Progress'] >= 0.70)
+        X['Log_Trade_Count'] = np.log1p(df['Trade_Count'])
 
     leaky_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points']
     for c in leaky_cols:
