@@ -18,8 +18,6 @@ import time
 import warnings
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
-import xgboost as xgb
 import lightgbm as lgb
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import (
@@ -39,7 +37,7 @@ t_start = time.time()
 # ---------------------------------------------------------------------------
 # A. Feature Engineering (AI: feel free to modify)
 # ---------------------------------------------------------------------------
-train_df, val_df, test_df = get_intraday_data()
+train_df, val_df, _ = get_intraday_data()
 
 def engineer_features(df):
     """
@@ -96,11 +94,19 @@ def engineer_features(df):
     X['VWAP_x_RangePos'] = df['VWAP_Dist'] * df['Range_Position']
     X['Mom3_x_Time'] = df['Mom3'] * df['Time_Progress']
     X['Mom6_x_Time'] = df['Mom6'] * df['Time_Progress']
-
+    
+    # --- New Interaction (Exp 10) ---
+    X['Ret_abs_x_Time'] = np.abs(df['Intraday_Ret_Now']) * df['Time_Progress']
+    X['Vol_x_Time'] = df['Vol_Ratio'] * df['Time_Progress']
+    
+    # Removed Exp 8: RSI_x_Time, Range_x_Vol (Worse AUC)
+    
     # Non-linear transforms
     X['Ret_abs'] = np.abs(df['Intraday_Ret_Now'])
     X['Open_Gap_sq'] = df['Open_Gap'] ** 2
     X['Open_Gap_abs'] = np.abs(df['Open_Gap'])
+    X['Log_Vol_Ratio'] = np.log1p(df['Vol_Ratio'])
+    X['Sqrt_Vol_Ratio'] = np.sqrt(df['Vol_Ratio'])
 
     # --- Static features (same value for entire day) ---
     X['TSM_Ret'] = df['TSM_Ret']
@@ -127,6 +133,62 @@ def engineer_features(df):
     # Static feature interactions
     X['TSM_SOX_Spread'] = df['TSM_Ret'] - df['SOX_Ret']
     X['Gap_x_TSM'] = df['Open_Gap'] * df['TSM_Ret']
+    
+    # --- Clean Core Set (Exp 26: The 0.60 Push) ---
+    # Volatility-Adjusted Momentum: Signal divided by recent noise
+    rolling_range = df['Bar_Range'].rolling(5).mean().fillna(df['Bar_Range'].iloc[0])
+    X['Vol_Adj_Mom'] = df['Mom3'] / (rolling_range + 0.001)
+    
+    # Champion base (Exp 19)
+    X['Ret_Persistence'] = df['Intraday_Ret_Now'].rolling(3).sum().fillna(0)
+    X['Vol_x_Time'] = df['Vol_Ratio'] * df['Time_Progress']
+    X['NetOI_x_Gap'] = df['NetOI_Diff'] * df['Open_Gap']
+
+    # --- Phase 1A: 時段感知特徵 ---
+    X['Is_Morning']   = (df['Time_Progress'] < 0.30).astype(float)
+    X['Is_Midday']    = ((df['Time_Progress'] >= 0.30) & (df['Time_Progress'] < 0.70)).astype(float)
+    X['Is_Afternoon'] = (df['Time_Progress'] >= 0.70).astype(float)
+
+    X['NetOI_x_Morning']   = df['NetOI_Diff'] * X['Is_Morning']
+    X['NetOI_x_Afternoon'] = df['NetOI_Diff'] * X['Is_Afternoon']
+    X['Gap_x_Morning']     = df['Open_Gap']   * X['Is_Morning']
+    X['TSM_x_Afternoon']   = df['TSM_Ret']    * X['Is_Afternoon']
+
+    X['VWAP_x_Morning']    = df['VWAP_Dist']        * X['Is_Morning']
+    X['VWAP_x_Afternoon']  = df['VWAP_Dist']        * X['Is_Afternoon']
+    X['Mom3_x_Afternoon']  = df['Mom3']             * X['Is_Afternoon']
+    X['Ret_x_Afternoon']   = df['Intraday_Ret_Now'] * X['Is_Afternoon']
+    X['Vol_x_Morning']     = df['Vol_Ratio']        * X['Is_Morning']
+
+    # --- Phase 1B: 盤中 RSI（14 bars ≈ 70 分鐘週期）---
+    if 'TradingDate' in df.columns:
+        gains  = df['Bar_Body'].clip(lower=0)
+        losses = (-df['Bar_Body']).clip(lower=0)
+        avg_gain = gains.groupby(df['TradingDate']).transform(lambda s: s.ewm(span=14, min_periods=1).mean())
+        avg_loss = losses.groupby(df['TradingDate']).transform(lambda s: s.ewm(span=14, min_periods=1).mean())
+        X['Intraday_RSI'] = 100 - 100 / (1 + avg_gain / (avg_loss + 1e-9))
+        # 注意: groupby+transform+ewm 在 pandas 中 index alignment 正確，但可透過
+        # X['Intraday_RSI'].groupby(df['TradingDate']).first() 驗證首值約為 50.0
+        X['RSI_Overbought']  = (X['Intraday_RSI'] > 70).astype(float)
+        X['RSI_Oversold']    = (X['Intraday_RSI'] < 30).astype(float)
+
+    # --- Phase 1C: Reversal 信號 ---
+    X['Mom_Divergence'] = df['Mom3'] - df['Mom6']
+
+    # 注意: rolling(5).std() 前 2 個 bar 的 std=NaN → fillna(0)，
+    # 導致開盤前兩根 bar 的 VWAP_Extreme 偏向 1，為已知且可接受的行為
+    vwap_std = df.groupby('TradingDate')['VWAP_Dist'].transform(
+        lambda s: s.rolling(5, min_periods=1).std().fillna(0)
+    )
+    X['VWAP_Extreme']   = (np.abs(df['VWAP_Dist']) > vwap_std).astype(float)
+    X['VWAP_Reversal']  = -df['VWAP_Dist'] * X['VWAP_Extreme']
+
+    X['Near_High'] = (df['Range_Position'] > 0.85).astype(float)
+    X['Near_Low']  = (df['Range_Position'] < 0.15).astype(float)
+
+    leaky_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points']
+    for c in leaky_cols:
+        assert c not in X.columns, f"Data leakage detected: {c} in features!"
 
     X.fillna(0, inplace=True)
 
@@ -149,28 +211,34 @@ def engineer_features(df):
 
 # Direction Classifier (LightGBM)
 DIR_CLF_PARAMS = dict(
-    n_estimators=800,
-    max_depth=5,
-    num_leaves=31,
-    learning_rate=0.02,
-    subsample=0.7,
-    colsample_bytree=0.8,
-    reg_alpha=0.1,
-    reg_lambda=1.0,
+    n_estimators=3000,
+    max_depth=6,
+    num_leaves=63,
+    learning_rate=0.003,
+    subsample=0.75,
+    colsample_bytree=0.75,
+    min_child_samples=30,
+    reg_alpha=3.0,
+    reg_lambda=15.0,
+    bagging_freq=5,
+    bagging_fraction=0.7,
     random_state=RANDOM_SEED,
     verbose=-1,
 )
 
 # Remaining Points Regressor (LightGBM)
 PTS_REG_PARAMS = dict(
-    n_estimators=800,
-    max_depth=4,
-    num_leaves=15,
-    learning_rate=0.02,
-    subsample=0.7,
-    colsample_bytree=0.8,
-    reg_alpha=0.1,
-    reg_lambda=2.0,
+    n_estimators=3000,
+    max_depth=6,
+    num_leaves=63,
+    learning_rate=0.003,
+    subsample=0.75,
+    colsample_bytree=0.75,
+    min_child_samples=30,
+    reg_alpha=3.0,
+    reg_lambda=15.0,
+    bagging_freq=5,
+    bagging_fraction=0.7,
     random_state=RANDOM_SEED,
     verbose=-1,
 )

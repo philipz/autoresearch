@@ -69,6 +69,20 @@ def _load_daily_features():
     else:
         df['Sentiment_Score'] = 0.0
         df['Sentiment_Conf'] = 0.0
+        
+    # --- FIX DATA LEAKAGE ---
+    # The following daily features are calculated using `Close_T`.
+    # Using them on day `T`'s intraday snapshots would mean seeing into the future!
+    # Therefore, we MUST shift them by 1 day so day `T` sees `T-1`'s values.
+    leaky_cols = ['Intraday_Ret', 'Intraday_Point', 'TX_Ret', 'MA5', 'MA20', 'RSI']
+    for col in leaky_cols:
+        if col in df.columns:
+            df[col] = df[col].shift(1)
+            
+    # Forward-fill / fillna for the first row after shifting
+    df.ffill(inplace=True)
+    df.fillna(0.0, inplace=True)
+        
     return df
 
 
@@ -94,100 +108,88 @@ def _compute_intraday_features(kbar_day):
     Returns:
         DataFrame with one row per snapshot, indexed by Time.
     """
-    if kbar_day.empty:
+    if len(kbar_day) == 0:
         return pd.DataFrame()
     
     kbar = kbar_day.sort_values('Time').reset_index(drop=True)
     day_open = kbar['Open'].iloc[0]
     day_close = kbar['Close'].iloc[-1]
     
-    snapshots = []
+    # Vectorized calculations
+    cum_volume = kbar['Volume'].cumsum()
+    bar_typical_price = (kbar['High'] + kbar['Low'] + kbar['Close']) / 3.0
+    cum_vwap_numerator = (bar_typical_price * kbar['Volume']).cumsum()
+    running_high = kbar['High'].cummax()
+    running_low = kbar['Low'].cummin()
+    current_price = kbar['Close']
     
-    cum_volume = 0
-    cum_vwap_numerator = 0.0  # sum(typical_price * volume)
-    running_high = -np.inf
-    running_low = np.inf
+    # ── Dynamic Features ──
+    # 1. Intraday return since open (%)
+    intraday_ret = (current_price - day_open) / day_open
     
-    for i, row in kbar.iterrows():
-        bar_typical_price = (row['High'] + row['Low'] + row['Close']) / 3.0
-        cum_volume += row['Volume']
-        cum_vwap_numerator += bar_typical_price * row['Volume']
-        running_high = max(running_high, row['High'])
-        running_low = min(running_low, row['Low'])
-        
-        current_price = row['Close']
-        
-        # ── Dynamic Features ──
-        # 1. Intraday return since open (%)
-        intraday_ret = (current_price - day_open) / day_open
-        
-        # 2. VWAP and distance
-        vwap = cum_vwap_numerator / cum_volume if cum_volume > 0 else current_price
-        vwap_dist = (current_price - vwap) / vwap  # positive = above VWAP
-        
-        # 3. Volume momentum (current bar volume vs average so far)
-        avg_vol = cum_volume / (i + 1) if (i + 1) > 0 else row['Volume']
-        vol_ratio = row['Volume'] / avg_vol if avg_vol > 0 else 1.0
-        
-        # 4. Running range (high-low spread normalized by open)
-        day_range = (running_high - running_low) / day_open
-        
-        # 5. Position in day's range (0=at low, 1=at high)
-        range_span = running_high - running_low
-        range_position = (current_price - running_low) / range_span if range_span > 0 else 0.5
-        
-        # 6. Time of day (normalized: 0=08:45, 1=13:45)
-        # There are typically ~60 bars, so bar_index / total gives progress
-        time_progress = i / max(len(kbar) - 1, 1)
-        
-        # 7. Bar body and shadow ratios
-        bar_body = (row['Close'] - row['Open']) / day_open  # positive=bullish bar
-        bar_range = (row['High'] - row['Low']) / day_open
-        
-        # 8. Short-term momentum (last 3 bars return)
-        if i >= 2:
-            mom3_price = kbar['Close'].iloc[i-2]
-            mom3 = (current_price - mom3_price) / mom3_price
-        else:
-            mom3 = 0.0
-            
-        # 9. Short-term momentum (last 6 bars = 30 min)
-        if i >= 5:
-            mom6_price = kbar['Close'].iloc[i-5]
-            mom6 = (current_price - mom6_price) / mom6_price
-        else:
-            mom6 = 0.0
-        
-        # ── Target ──
-        # Remaining return from this snapshot to day close
-        remaining_ret = (day_close - current_price) / current_price
-        # Direction: will it go up from here?
-        remaining_dir = 1 if remaining_ret > 0 else 0
-        # Remaining points
-        remaining_points = day_close - current_price
-        
-        snapshots.append({
-            'Time': row['Time'],
-            # Dynamic features
-            'Intraday_Ret_Now': intraday_ret,
-            'VWAP_Dist': vwap_dist,
-            'Vol_Ratio': vol_ratio,
-            'Day_Range': day_range,
-            'Range_Position': range_position,
-            'Time_Progress': time_progress,
-            'Bar_Body': bar_body,
-            'Bar_Range': bar_range,
-            'Mom3': mom3,
-            'Mom6': mom6,
-            'Cum_Volume': cum_volume,
-            'Current_Price': current_price,
-            # Targets
-            'Remaining_Ret': remaining_ret,
-            'Remaining_Dir': remaining_dir,
-            'Remaining_Points': remaining_points,
-        })
+    # 2. VWAP and distance
+    vwap = np.where(cum_volume > 0, cum_vwap_numerator / cum_volume, current_price)
+    vwap_dist = (current_price - vwap) / vwap
     
-    return pd.DataFrame(snapshots)
+    # 3. Volume momentum (current bar volume vs average of PRIOR bars)
+    # prior_cum_volume is the total volume before this bar
+    prior_cum_volume = cum_volume - kbar['Volume']
+    # For the first bar (index=0), we use its own volume as the 'average' to avoid division by zero
+    avg_prior_vol = np.where(kbar.index > 0, prior_cum_volume / kbar.index, kbar['Volume'])
+    vol_ratio = np.where(avg_prior_vol > 0, kbar['Volume'] / avg_prior_vol, 1.0)
+    
+    # 4. Running range (high-low spread normalized by open)
+    day_range = (running_high - running_low) / day_open
+    
+    # 5. Position in day's range (0=at low, 1=at high)
+    range_span = running_high - running_low
+    range_position = np.where(range_span > 0, (current_price - running_low) / range_span, 0.5)
+    
+    # 6. Time of day (normalized: 0=08:45, 1=13:45)
+    time_progress = kbar.index / max(len(kbar) - 1, 1)
+    
+    # 7. Bar body and shadow ratios
+    bar_body = (kbar['Close'] - kbar['Open']) / day_open
+    bar_range = (kbar['High'] - kbar['Low']) / day_open
+    
+    # 8. Short-term momentum (last 3 bars return)
+    mom3 = ((current_price - kbar['Close'].shift(2)) / kbar['Close'].shift(2)).fillna(0.0)
+        
+    # 9. Short-term momentum (last 6 bars = 30 min)
+    mom6 = ((current_price - kbar['Close'].shift(5)) / kbar['Close'].shift(5)).fillna(0.0)
+    
+    # ── Target ──
+    remaining_ret = (day_close - current_price) / current_price
+    remaining_dir = (remaining_ret > 0).astype(int)
+    remaining_points = day_close - current_price
+    
+    snapshots = pd.DataFrame({
+        'Time': kbar['Time'],
+        # Dynamic features
+        'Intraday_Ret_Now': intraday_ret,
+        'VWAP_Dist': vwap_dist,
+        'Vol_Ratio': vol_ratio,
+        'Day_Range': day_range,
+        'Range_Position': range_position,
+        'Time_Progress': time_progress,
+        'Bar_Body': bar_body,
+        'Bar_Range': bar_range,
+        'Mom3': mom3,
+        'Mom6': mom6,
+        'Cum_Volume': cum_volume,
+        'Current_Price': current_price,
+        # Targets
+        'Remaining_Ret': remaining_ret,
+        'Remaining_Dir': remaining_dir,
+        'Remaining_Points': remaining_points,
+    })
+    
+    # Exclude the last bar of the day because its Remaining_Ret is trivially zero (current_price == day_close)
+    # This prevents the model from artificially padding accuracy metrics at Time_Progress=1.0
+    if len(snapshots) > 1:
+        snapshots = snapshots.iloc[:-1]
+        
+    return snapshots
 
 
 def build_intraday_dataset():
@@ -211,25 +213,16 @@ def build_intraday_dataset():
         print("ERROR: No overlapping dates between daily and 5-min data!")
         sys.exit(1)
     
-    all_snapshots = []
+    # Vectorized compute over multiple dates
+    valid_kbar = kbar[kbar['TradingDate'].isin(common_dates)]
     
-    for dt in common_dates:
-        day_kbar = kbar[kbar['TradingDate'] == dt]
-        day_static = daily.loc[dt]
+    # apply includes TradingDate in index, so we reset_index to keep it as a column
+    all_snapshots = valid_kbar.groupby('TradingDate', group_keys=True).apply(_compute_intraday_features).reset_index()
+    if 'level_1' in all_snapshots.columns:
+        all_snapshots.drop(columns=['level_1'], inplace=True)
         
-        # Compute dynamic features for this day
-        snap_df = _compute_intraday_features(day_kbar)
-        if snap_df.empty:
-            continue
-        
-        # Attach static features (broadcast across all snapshots of this day)
-        for col in daily.columns:
-            snap_df[col] = day_static[col]
-        
-        snap_df['TradingDate'] = dt
-        all_snapshots.append(snap_df)
-    
-    result = pd.concat(all_snapshots, ignore_index=True)
+    # Merge with static features
+    result = pd.merge(all_snapshots, daily, left_on='TradingDate', right_index=True, how='left')
     
     # Reorder columns: TradingDate, Time, dynamic features, static features, targets
     dynamic_cols = [
