@@ -80,8 +80,11 @@ def _load_daily_features():
         if col in df.columns:
             df[col] = df[col].shift(1)
             
-    # Use backfill then forward fill to avoid 0.0 outliers for MA5/RSI on the first day
-    df.bfill(inplace=True)
+    # Only backfill the shifted leaky columns to avoid look-ahead bias if other columns have NaNs
+    for col in leaky_cols:
+        if col in df.columns:
+            df[col] = df[col].bfill()
+            
     df.ffill(inplace=True)
     df.fillna(0.0, inplace=True)
         
@@ -166,7 +169,8 @@ def _compute_intraday_features(kbar_day):
     remaining_points = day_close - current_price
 
     # ── Short-term Targets（未來 3 bar = 15 分鐘）──
-    # shift(-3) 往前看 3 根 bar；最後 3 根 bar 無目標，設為 NaN
+    # shift(-3) 往前看 3 根 bar；每日最後 3 根 bar 會因為無未來數據而產生 NaN。
+    # 注意：這些 NaN 會保留在資料集中，若實驗需使用 Next3 目標，應自行進行 dropna 或 fillna。
     next3_close = kbar['Close'].shift(-3)
     next3_ret = (next3_close - current_price) / current_price
     # 保留 NaN：用 where 避免 (NaN > 0) 轉為 False 而遺失 NaN 標記

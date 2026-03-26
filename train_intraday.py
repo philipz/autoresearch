@@ -416,10 +416,11 @@ if __name__ == "__main__":
         clf_path = Config.INTRADAY_CLF_LGBM_PATH
         reg_path = Config.INTRADAY_REG_LGBM_PATH
     else:
-        # Standalone fallback: save to local models/ directory
-        os.makedirs('../models', exist_ok=True)
-        clf_path = '../models/intraday_clf_lgbm.pkl'
-        reg_path = '../models/intraday_reg_lgbm.pkl'
+        # Standalone fallback: save to local models/ directory relative to this script
+        models_dir = os.path.join(os.path.dirname(__file__), '..', 'models')
+        os.makedirs(models_dir, exist_ok=True)
+        clf_path = os.path.join(models_dir, 'intraday_clf_lgbm.pkl')
+        reg_path = os.path.join(models_dir, 'intraday_reg_lgbm.pkl')
 
     joblib.dump(metrics['_dir_clf'], clf_path)
     joblib.dump(metrics['_pts_reg'], reg_path)
