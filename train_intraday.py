@@ -358,10 +358,11 @@ def composite_metric(metrics):
     """
     Compute a single "north star" metric. LOWER IS BETTER.
 
-    使用 Morning+Midday 合併 AUC 作為方向損失（實際部署時段）。
+    使用全天 AUC 作為方向損失（跨實驗可比）。
+    注意：Morning+Midday AUC (val_mm_auc) 另行輸出作為部署指標參考。
 
-    - Direction loss:    (1 - val_mm_auc)  → Morning+Midday 合併 AUC
-    - Points loss:       MAE / 100         → normalized by typical move (~50-100 pts)
+    - Direction loss:    (1 - val_dir_auc)  → 全天 AUC（跨實驗可比）
+    - Points loss:       MAE / 100          → normalized by typical move (~50-100 pts)
 
     Weights:
     - 50% direction (most important for entry signal)
