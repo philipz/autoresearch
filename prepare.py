@@ -121,7 +121,74 @@ def _load_cached():
 # Runtime API (imported by train.py)
 # ---------------------------------------------------------------------------
 
-def get_data():
+class Tokenizer:
+    """Minimal tokenizer wrapper. Training is handled above."""
+
+    def __init__(self, enc):
+        self.enc = enc
+        self.bos_token_id = enc.encode_single_token(BOS_TOKEN)
+
+    @classmethod
+    def from_directory(cls, tokenizer_dir=TOKENIZER_DIR):
+        with open(os.path.join(tokenizer_dir, "tokenizer.pkl"), "rb") as f:
+            enc = pickle.load(f)
+        return cls(enc)
+
+    def get_vocab_size(self):
+        return self.enc.n_vocab
+
+    def get_bos_token_id(self):
+        return self.bos_token_id
+
+    def encode(self, text, prepend=None, num_threads=8):
+        if prepend is not None:
+            prepend_id = prepend if isinstance(prepend, int) else self.enc.encode_single_token(prepend)
+        if isinstance(text, str):
+            ids = self.enc.encode_ordinary(text)
+            if prepend is not None:
+                ids.insert(0, prepend_id)
+        elif isinstance(text, list):
+            ids = self.enc.encode_ordinary_batch(text, num_threads=num_threads)
+            if prepend is not None:
+                for row in ids:
+                    row.insert(0, prepend_id)
+        else:
+            raise ValueError(f"Invalid input type: {type(text)}")
+        return ids
+
+    def decode(self, ids):
+        return self.enc.decode(ids)
+
+
+def get_token_bytes(device="cpu"):
+    path = os.path.join(TOKENIZER_DIR, "token_bytes.pt")
+    with open(path, "rb") as f:
+        return torch.load(f, map_location=device)
+
+
+def _document_batches(split, tokenizer_batch_size=128):
+    """Infinite iterator over document batches from parquet files."""
+    parquet_paths = list_parquet_files()
+    assert len(parquet_paths) > 0, "No parquet files found. Run prepare.py first."
+    val_path = os.path.join(DATA_DIR, VAL_FILENAME)
+    if split == "train":
+        parquet_paths = [p for p in parquet_paths if p != val_path]
+        assert len(parquet_paths) > 0, "No training shards found."
+    else:
+        parquet_paths = [val_path]
+    epoch = 1
+    while True:
+        for filepath in parquet_paths:
+            pf = pq.ParquetFile(filepath)
+            for rg_idx in range(pf.num_row_groups):
+                rg = pf.read_row_group(rg_idx)
+                batch = rg.column('text').to_pylist()
+                for i in range(0, len(batch), tokenizer_batch_size):
+                    yield batch[i:i+tokenizer_batch_size], epoch
+        epoch += 1
+
+
+def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
     """
     Returns (train_df, val_df, test_df) — immutable copies.
 
