@@ -193,23 +193,25 @@ def engineer_features(df):
     X['Near_High'] = (df['Range_Position'] > 0.85).astype(float)
     X['Near_Low']  = (df['Range_Position'] < 0.15).astype(float)
 
-    # --- Phase 2: OFI 逐筆流量特徵 ---
-    ofi_cols = ['OFI', 'Cum_OFI', 'Trade_Count', 'Avg_Trade_Size',
-                'Large_Trade_Ratio', 'OFI_SMA3']
-    for col in ofi_cols:
+    # --- Phase 2: OFI 逐筆流量特徵（反轉版：均值回歸假設）---
+    # Trade_Count, Avg_Trade_Size, Large_Trade_Ratio 不涉及方向，保持原值
+    for col in ['Trade_Count', 'Avg_Trade_Size', 'Large_Trade_Ratio']:
         if col in df.columns:
             X[col] = df[col]
 
-    # OFI 互動特徵（流量方向 × 時段）
+    # OFI 方向性特徵取負（買壓 → 預期回落）
     if 'OFI' in df.columns:
-        # OFI_x_Time：收盤前的 OFI 信號更強（Time_Progress 越大，權重越高）
-        X['OFI_x_Time']      = df['OFI'] * df['Time_Progress']
-        X['Cum_OFI_x_Time']  = df['Cum_OFI'] * df['Time_Progress']
-        X['OFI_x_VWAP']      = df['OFI'] * df['VWAP_Dist']
-        X['OFI_Extreme']     = (np.abs(df['OFI']) > 0.5).astype(float)
-        X['OFI_x_Morning']   = df['OFI'] * (df['Time_Progress'] < 0.30)
-        X['OFI_x_Afternoon'] = df['OFI'] * (df['Time_Progress'] >= 0.70)
-        X['Log_Trade_Count'] = np.log1p(df['Trade_Count'])
+        X['OFI_Rev']         = -df['OFI']          # 反向 OFI
+        X['Cum_OFI_Rev']     = -df['Cum_OFI']      # 反向累計 OFI
+        X['OFI_SMA3_Rev']    = -df['OFI_SMA3']     # 反向 3-bar 均值
+        # 反向 OFI × 時段互動
+        X['OFI_Rev_x_Time']      = -df['OFI'] * df['Time_Progress']
+        X['Cum_OFI_Rev_x_Time']  = -df['Cum_OFI'] * df['Time_Progress']
+        X['OFI_Rev_x_VWAP']      = -df['OFI'] * df['VWAP_Dist']
+        X['OFI_Extreme']         = (np.abs(df['OFI']) > 0.5).astype(float)
+        X['OFI_Rev_x_Morning']   = -df['OFI'] * (df['Time_Progress'] < 0.30)
+        X['OFI_Rev_x_Afternoon'] = -df['OFI'] * (df['Time_Progress'] >= 0.70)
+        X['Log_Trade_Count']     = np.log1p(df['Trade_Count'])
 
     leaky_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points']
     for c in leaky_cols:
@@ -218,18 +220,9 @@ def engineer_features(df):
     X.fillna(0, inplace=True)
 
     # --- Targets ---
-    # 短期 Target：未來 3 bar（15 分鐘），排除末端 NaN rows
-    if 'Next3_Dir' in df.columns and df['Next3_Dir'].notna().any():
-        valid_mask = df['Next3_Dir'].notna()
-        y_dir = df['Next3_Dir'][valid_mask].copy()
-        y_ret = df['Next3_Ret'][valid_mask].copy()
-        y_pts = df['Next3_Pts'][valid_mask].copy()
-        X = X[valid_mask]
-    else:
-        # Fallback to original targets
-        y_dir = df['Remaining_Dir'].copy()
-        y_ret = df['Remaining_Ret'].copy()
-        y_pts = df['Remaining_Points'].copy()
+    y_dir = df['Remaining_Dir'].copy()
+    y_ret = df['Remaining_Ret'].copy()
+    y_pts = df['Remaining_Points'].copy()
 
     return {
         'X': X,

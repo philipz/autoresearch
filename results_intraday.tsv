@@ -7,3 +7,4 @@ fc63352	0.559211	0.550149	discard	Phase1b: 時段+RSI+Reversal, 原版超參數
 71e4319	0.552862	0.550639	discard	Phase2: OFI+Cum_OFI+互動項
 7b2b535	0.566810	0.471771	diagnostic	Diag-C: 純動態特徵（無靜態）
 phase-b	0.368798	0.490286	discard	Phase-B: Next3-bar target(15min), OFI+動態特徵
+7b2b535	0.553456	0.551555	discard	Phase-B2: OFI反轉(均值回歸), Remaining_Dir target
