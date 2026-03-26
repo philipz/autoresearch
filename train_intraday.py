@@ -32,7 +32,10 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from prepare_intraday import get_intraday_data, TIME_BUDGET, RANDOM_SEED
-from src.config import Config
+try:
+    from src.config import Config
+except ImportError:
+    Config = None  # Fallback for standalone sandbox usage
 
 warnings.filterwarnings('ignore')
 np.random.seed(RANDOM_SEED)
@@ -108,12 +111,12 @@ def engineer_features(df):
     X['TSM_SOX_Spread'] = df['TSM_Ret'] - df['SOX_Ret']
     X['Gap_x_TSM'] = df['Open_Gap'] * df['TSM_Ret']
 
-    # Vol-Adjusted Momentum (Exp 26)
-    rolling_range = df['Bar_Range'].rolling(5).mean().fillna(df['Bar_Range'].iloc[0])
+    # Vol-Adjusted Momentum (Exp 26) - Group by date to avoid cross-day noise
+    rolling_range = df.groupby('TradingDate')['Bar_Range'].transform(lambda x: x.rolling(5).mean().fillna(x.iloc[0]))
     X['Vol_Adj_Mom'] = df['Mom3'] / (rolling_range + 0.001)
 
-    # Champion features (Exp 19)
-    X['Ret_Persistence'] = df['Intraday_Ret_Now'].rolling(3).sum().fillna(0)
+    # Champion features (Exp 19) - Group by date to avoid cross-day noise
+    X['Ret_Persistence'] = df.groupby('TradingDate')['Intraday_Ret_Now'].transform(lambda x: x.rolling(3).sum().fillna(0))
     X['NetOI_x_Gap'] = df['NetOI_Diff'] * df['Open_Gap']
 
     # --- OFI 逐筆流量特徵 ---
@@ -319,10 +322,9 @@ def train_and_evaluate_cv(train_df, val_df):
         print(f"  {seg_name:<30} {excess:>10.4f} {conf:>10.2f}  {advice}")
 
     # 動態產生信心建議（基於實測數據，非硬編碼）
-    seg_list = list(conf_scores.items())
-    morning_conf = seg_list[0][1]
-    midday_conf  = seg_list[1][1]
-    afternoon_conf = seg_list[2][1]
+    morning_conf = conf_scores.get('Morning', 0.0)
+    midday_conf  = conf_scores.get('Midday', 0.0)
+    afternoon_conf = conf_scores.get('Afternoon', 0.0)
     print("\n  實作建議：prediction_confidence = f(Time_Progress)")
     print(f"    if Time_Progress < {MORNING_CUTOFF:.2f}:  confidence = {morning_conf:.2f}  (Morning)")
     print(f"    if Time_Progress < {AFTERNOON_CUTOFF:.2f}:  confidence = {midday_conf:.2f}  (Midday)")
@@ -408,10 +410,19 @@ if __name__ == "__main__":
     print(f"train_rows:       {len(train_df)}")
     print(f"val_rows:         {len(val_df)}")
 
-    # --- 儲存模型到 models/ ---
-    Config.ensure_directories()
-    joblib.dump(metrics['_dir_clf'], Config.INTRADAY_CLF_LGBM_PATH)
-    joblib.dump(metrics['_pts_reg'], Config.INTRADAY_REG_LGBM_PATH)
+    # --- 儲存模型 ---
+    if Config:
+        Config.ensure_directories()
+        clf_path = Config.INTRADAY_CLF_LGBM_PATH
+        reg_path = Config.INTRADAY_REG_LGBM_PATH
+    else:
+        # Standalone fallback: save to local models/ directory
+        os.makedirs('../models', exist_ok=True)
+        clf_path = '../models/intraday_clf_lgbm.pkl'
+        reg_path = '../models/intraday_reg_lgbm.pkl'
+
+    joblib.dump(metrics['_dir_clf'], clf_path)
+    joblib.dump(metrics['_pts_reg'], reg_path)
     print(f"\nModels saved:")
-    print(f"  {Config.INTRADAY_CLF_LGBM_PATH}")
-    print(f"  {Config.INTRADAY_REG_LGBM_PATH}")
+    print(f"  {clf_path}")
+    print(f"  {reg_path}")

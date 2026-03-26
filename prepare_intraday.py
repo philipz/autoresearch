@@ -80,7 +80,8 @@ def _load_daily_features():
         if col in df.columns:
             df[col] = df[col].shift(1)
             
-    # Forward-fill / fillna for the first row after shifting
+    # Use backfill then forward fill to avoid 0.0 outliers for MA5/RSI on the first day
+    df.bfill(inplace=True)
     df.ffill(inplace=True)
     df.fillna(0.0, inplace=True)
         
@@ -199,8 +200,8 @@ def _compute_intraday_features(kbar_day):
     
     # Exclude the last bar of the day because its Remaining_Ret is trivially zero (current_price == day_close)
     # This prevents the model from artificially padding accuracy metrics at Time_Progress=1.0
-    if len(snapshots) > 1:
-        snapshots = snapshots.iloc[:-1]
+    # Also handles rare single-bar days by returning an empty DataFrame.
+    snapshots = snapshots.iloc[:-1]
         
     return snapshots
 
@@ -257,14 +258,18 @@ def build_intraday_dataset():
         print(f"合併 OFI 特徵從 {OFI_CACHE_FILE}...")
         ofi = pd.read_csv(OFI_CACHE_FILE)
         result = pd.merge(result, ofi, on=['TradingDate', 'Time'], how='left')
-        ofi_cols = ['OFI', 'Cum_OFI', 'Trade_Count', 'Avg_Trade_Size',
-                    'Large_Trade_Ratio', 'OFI_SMA3']
-        for col in ofi_cols:
-            if col in result.columns:
-                result[col] = result[col].fillna(0)
-        matched = (result['OFI'] != 0).sum()
-        print(f"OFI 合併完成，非零 rows: {matched}")
-        assert matched > 0, "OFI merge failed! Check ofi_features.csv TradingDate/Time format."
+        if 'OFI' in result.columns:
+            # Count actual matches (non-NaN before fillna)
+            matched_count = result['OFI'].count()
+            print(f"OFI 合併完成，匹配行數: {matched_count}/{len(result)}")
+            assert matched_count > 0, "OFI merge failed! Check ofi_features.csv TradingDate/Time format."
+            
+            # Now fill NaNs for the features
+            for col in ofi_cols:
+                if col in result.columns:
+                    result[col] = result[col].fillna(0)
+        else:
+            print("WARNING: 'OFI' column missing after merge.")
     else:
         print("WARNING: OFI cache 不存在，跳過 OFI 特徵。")
 

@@ -277,9 +277,6 @@ def composite_metric(metrics):
     composite = w_clf * gap_clf_loss + w_gap * gap_reg_loss + w_intra * intra_loss
     return composite
 
-
-
-    
 # ---------------------------------------------------------------------------
 # Main execution
 # ---------------------------------------------------------------------------
