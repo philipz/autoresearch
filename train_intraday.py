@@ -211,97 +211,139 @@ N_SPLITS = 5  # TimeSeriesSplit folds
 
 def train_and_evaluate_cv(train_df, val_df):
     """
-    Train models with TimeSeriesSplit cross-validation on train_df,
-    then evaluate on val_df for the final metrics.
+    分時段訓練：Morning / Midday / Afternoon 三個獨立 LightGBM 模型。
+    各時段分別做 TimeSeriesSplit CV，最後在 val_df 合併評估。
     """
-    train_data = engineer_features(train_df)
-    val_data = engineer_features(val_df)
+    SEGMENTS = {
+        'morning':   lambda df: df['Time_Progress'] < 0.30,
+        'midday':    lambda df: (df['Time_Progress'] >= 0.30) & (df['Time_Progress'] < 0.70),
+        'afternoon': lambda df: df['Time_Progress'] >= 0.70,
+    }
 
-    tscv = TimeSeriesSplit(n_splits=N_SPLITS)
+    trained_clfs = {}
+    trained_regs = {}
+    cv_dir_auc_all = []
+    cv_pts_mse_all = []
 
-    cv_dir_auc = []
-    cv_pts_mse = []
+    # ── 各時段訓練 ──
+    for seg_name, seg_mask_fn in SEGMENTS.items():
+        seg_train = train_df[seg_mask_fn(train_df)].copy()
+        if len(seg_train) == 0:
+            print(f"  [{seg_name}] 無訓練資料，跳過")
+            continue
 
-    X_train = train_data['X']
-    y_dir_train = train_data['y_dir']
-    y_pts_train = train_data['y_pts']
+        seg_data = engineer_features(seg_train)
+        X_seg = seg_data['X']
+        y_dir_seg = seg_data['y_dir']
+        y_pts_seg = seg_data['y_pts']
 
-    print(f"\nRunning {N_SPLITS}-fold TimeSeriesSplit CV on {len(X_train)} snapshots...")
+        print(f"\n[{seg_name.upper()}] {len(X_seg)} snapshots")
+        tscv = TimeSeriesSplit(n_splits=N_SPLITS)
+        seg_auc = []
+        seg_mse = []
 
-    for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_train)):
-        # Direction Classifier
-        clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
-        clf.fit(X_train.iloc[tr_idx], y_dir_train.iloc[tr_idx])
-        probs = clf.predict_proba(X_train.iloc[te_idx])
-        if probs.shape[1] == 2:
+        for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_seg)):
+            clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
+            clf.fit(X_seg.iloc[tr_idx], y_dir_seg.iloc[tr_idx])
+            probs = clf.predict_proba(X_seg.iloc[te_idx])
             try:
-                auc = roc_auc_score(y_dir_train.iloc[te_idx], probs[:, 1])
+                auc = roc_auc_score(y_dir_seg.iloc[te_idx], probs[:, 1]) if probs.shape[1] == 2 else 0.5
             except ValueError:
                 auc = 0.5
-        else:
-            auc = 0.5
-        cv_dir_auc.append(auc)
+            seg_auc.append(auc)
 
-        # Points Regressor
-        reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
-        reg.fit(X_train.iloc[tr_idx], y_pts_train.iloc[tr_idx])
-        preds = reg.predict(X_train.iloc[te_idx])
-        mse = mean_squared_error(y_pts_train.iloc[te_idx], preds)
-        cv_pts_mse.append(mse)
+            reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
+            reg.fit(X_seg.iloc[tr_idx], y_pts_seg.iloc[tr_idx])
+            preds = reg.predict(X_seg.iloc[te_idx])
+            seg_mse.append(mean_squared_error(y_pts_seg.iloc[te_idx], preds))
 
-        print(f"  Fold {fold+1}: AUC={auc:.4f}, MSE={mse:.2f}")
+        print(f"  CV AUC: {np.mean(seg_auc):.4f} ± {np.std(seg_auc):.4f}")
+        cv_dir_auc_all.extend(seg_auc)
+        cv_pts_mse_all.extend(seg_mse)
 
-    print(f"\nCV Averages:")
-    print(f"  Dir AUC:     {np.mean(cv_dir_auc):.4f} ± {np.std(cv_dir_auc):.4f}")
-    print(f"  Pts MSE:     {np.mean(cv_pts_mse):.2f} ± {np.std(cv_pts_mse):.2f}")
+        # 全段訓練資料 final model
+        clf_final = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
+        clf_final.fit(X_seg, y_dir_seg)
+        trained_clfs[seg_name] = clf_final
 
-    # --- Final models trained on full training set ---
-    print("\nTraining final models on full training set...")
+        reg_final = lgb.LGBMRegressor(**PTS_REG_PARAMS)
+        reg_final.fit(X_seg, y_pts_seg)
+        trained_regs[seg_name] = reg_final
 
-    dir_clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
-    dir_clf.fit(X_train, y_dir_train)
+    print(f"\nCV Averages (all segments):")
+    print(f"  Dir AUC: {np.mean(cv_dir_auc_all):.4f} ± {np.std(cv_dir_auc_all):.4f}")
+    print(f"  Pts MSE: {np.mean(cv_pts_mse_all):.2f}")
 
-    pts_reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
-    pts_reg.fit(X_train, y_pts_train)
-
-    # --- Validation set evaluation ---
+    # ── Validation 評估（合併各時段預測）──
     print("\nValidation set evaluation:")
+    val_dir_probs_all = []
+    val_dir_true_all  = []
+    val_pts_preds_all = []
+    val_pts_true_all  = []
 
-    X_val = val_data['X']
-    y_dir_val = val_data['y_dir']
-    y_pts_val = val_data['y_pts']
+    for seg_name, seg_mask_fn in SEGMENTS.items():
+        if seg_name not in trained_clfs:
+            continue
+        seg_val = val_df[seg_mask_fn(val_df)].copy()
+        if len(seg_val) == 0:
+            continue
 
-    # Direction
-    dir_probs = dir_clf.predict_proba(X_val)
-    dir_preds = dir_clf.predict(X_val)
+        seg_data = engineer_features(seg_val)
+        X_val_seg = seg_data['X']
+        y_dir_val = seg_data['y_dir']
+        y_pts_val = seg_data['y_pts']
+
+        dir_probs = trained_clfs[seg_name].predict_proba(X_val_seg)
+        pts_preds = trained_regs[seg_name].predict(X_val_seg)
+
+        val_dir_probs_all.append(dir_probs[:, 1])
+        val_dir_true_all.append(y_dir_val.values)
+        val_pts_preds_all.append(pts_preds)
+        val_pts_true_all.append(y_pts_val.values)
+
+        # 每時段獨立 AUC
+        try:
+            seg_auc = roc_auc_score(y_dir_val, dir_probs[:, 1])
+        except ValueError:
+            seg_auc = 0.5
+        seg_acc = accuracy_score(y_dir_val, trained_clfs[seg_name].predict(X_val_seg))
+        seg_mae = mean_absolute_error(y_pts_val, pts_preds)
+        print(f"  [{seg_name:9s}] AUC={seg_auc:.4f}  Acc={seg_acc:.4f}  MAE={seg_mae:.1f}pts")
+
+    # 合併全時段
+    y_dir_all   = np.concatenate(val_dir_true_all)
+    probs_all   = np.concatenate(val_dir_probs_all)
+    y_pts_all   = np.concatenate(val_pts_true_all)
+    pts_pred_all = np.concatenate(val_pts_preds_all)
+
     try:
-        val_dir_auc = roc_auc_score(y_dir_val, dir_probs[:, 1])
+        val_dir_auc = roc_auc_score(y_dir_all, probs_all)
     except ValueError:
         val_dir_auc = 0.5
-    val_dir_acc = accuracy_score(y_dir_val, dir_preds)
-    print(f"  Dir Accuracy: {val_dir_acc:.4f}")
-    print(f"  Dir AUC:      {val_dir_auc:.4f}")
+    val_dir_acc  = accuracy_score(y_dir_all, (probs_all >= 0.5).astype(int))
+    val_pts_mse  = mean_squared_error(y_pts_all, pts_pred_all)
+    val_pts_mae  = mean_absolute_error(y_pts_all, pts_pred_all)
 
-    # Points
-    pts_preds = pts_reg.predict(X_val)
-    val_pts_mse = mean_squared_error(y_pts_val, pts_preds)
-    val_pts_mae = mean_absolute_error(y_pts_val, pts_preds)
-    print(f"  Pts MSE:      {val_pts_mse:.2f}")
-    print(f"  Pts MAE:      {val_pts_mae:.2f} points")
+    print(f"\n  [overall   ] AUC={val_dir_auc:.4f}  Acc={val_dir_acc:.4f}  MAE={val_pts_mae:.1f}pts  MSE={val_pts_mse:.2f}")
 
-    # Feature importance
-    print("\n[Feature Importance - Direction Classifier]")
-    feat_names = X_train.columns.tolist()
-    for feat, imp in sorted(zip(feat_names, dir_clf.feature_importances_), key=lambda x: -x[1])[:10]:
-        print(f"  {feat}: {imp:.4f}")
+    # Feature importance（用 afternoon 模型，收盤前信號最重要）
+    print("\n[Feature Importance - Afternoon Classifier]")
+    if 'afternoon' in trained_clfs:
+        aft_data = engineer_features(train_df[SEGMENTS['afternoon'](train_df)])
+        feat_names = aft_data['X'].columns.tolist()
+        for feat, imp in sorted(
+            zip(feat_names, trained_clfs['afternoon'].feature_importances_),
+            key=lambda x: -x[1]
+        )[:10]:
+            print(f"  {feat}: {imp:.4f}")
 
     return {
         'val_dir_auc': val_dir_auc,
         'val_dir_acc': val_dir_acc,
         'val_pts_mse': val_pts_mse,
         'val_pts_mae': val_pts_mae,
-        'cv_dir_auc_mean': np.mean(cv_dir_auc),
-        'cv_pts_mse_mean': np.mean(cv_pts_mse),
+        'cv_dir_auc_mean': np.mean(cv_dir_auc_all),
+        'cv_pts_mse_mean': np.mean(cv_pts_mse_all),
     }
 
 

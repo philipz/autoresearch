@@ -1,0 +1,51 @@
+Loading cached intraday snapshots from /Users/cfh00805122/lab/playground/futures-research/autoresearch_sandbox/.cache/intraday_snapshots.csv...
+Intraday data loaded: train=16839 (286 days), val=3604 (61 days), test=3658 (62 days)
+============================================================
+Autoresearch Sandbox — Intraday Model Training
+============================================================
+
+[MORNING] 5127 snapshots
+  CV AUC: 0.4961 ± 0.0436
+
+[MIDDAY] 6838 snapshots
+  CV AUC: 0.4761 ± 0.0604
+
+[AFTERNOON] 4874 snapshots
+  CV AUC: 0.5390 ± 0.0483
+
+CV Averages (all segments):
+  Dir AUC: 0.5037 ± 0.0576
+  Pts MSE: 16214.78
+
+Validation set evaluation:
+  [morning  ] AUC=0.5726  Acc=0.5865  MAE=97.8pts
+  [midday   ] AUC=0.5279  Acc=0.5212  MAE=53.6pts
+  [afternoon] AUC=0.4999  Acc=0.4866  MAE=29.4pts
+
+  [overall   ] AUC=0.5312  Acc=0.5311  MAE=60.0pts  MSE=7485.44
+
+[Feature Importance - Afternoon Classifier]
+  TSM_SOX_Spread: 4815.0000
+  NetOI_x_Gap: 4368.0000
+  Prev_Intraday_Ret: 4205.0000
+  RSI: 4184.0000
+  NetOI_Diff: 4026.0000
+  TX_Ret: 3982.0000
+  Log_Cum_Volume: 3976.0000
+  Open_Gap_sq: 3641.0000
+  MA5_MA20_Spread: 3601.0000
+  Day_Range: 3519.0000
+
+---
+composite_score:  0.534614
+val_dir_auc:      0.531234
+val_dir_acc:      0.531077
+val_pts_mse:      7485.44
+val_pts_mae:      60.05
+cv_dir_auc_mean:  0.503731
+cv_pts_mse_mean:  16214.78
+training_seconds: 233.5
+total_seconds:    233.6
+n_splits:         5
+train_rows:       16839
+val_rows:         3604
