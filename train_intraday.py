@@ -62,19 +62,12 @@ def engineer_features(df):
         Intraday_Ret (previous day), TX_Ret, MA5, MA20, RSI,
         Sentiment_Score, Sentiment_Conf
 
-    OFI features (if ofi_features.csv cache exists):
-        OFI               - Order Flow Imbalance per 5-min bar (tick rule)
-        Cum_OFI           - Cumulative OFI since open
-        Trade_Count       - Number of ticks per bar
-        Large_Trade_Ratio - Ratio of large trades (>= 10 lots)
-        OFI_SMA3          - 3-bar rolling mean OFI
-
     Returns:
         dict with keys:
             'X': feature matrix
-            'y_dir': target for next-3-bar direction (binary, 15-min horizon)
-            'y_ret': target for next-3-bar return
-            'y_pts': target for next-3-bar points
+            'y_dir': target for remaining direction (binary)
+            'y_ret': target for remaining return (regression)
+            'y_pts': target for remaining points (regression)
     """
     # --- Dynamic features ---
     X = pd.DataFrame(index=df.index)
@@ -151,68 +144,6 @@ def engineer_features(df):
     X['Vol_x_Time'] = df['Vol_Ratio'] * df['Time_Progress']
     X['NetOI_x_Gap'] = df['NetOI_Diff'] * df['Open_Gap']
 
-    # --- Phase 1A: 時段感知特徵 ---
-    X['Is_Morning']   = (df['Time_Progress'] < 0.30).astype(float)
-    X['Is_Midday']    = ((df['Time_Progress'] >= 0.30) & (df['Time_Progress'] < 0.70)).astype(float)
-    X['Is_Afternoon'] = (df['Time_Progress'] >= 0.70).astype(float)
-
-    X['NetOI_x_Morning']   = df['NetOI_Diff'] * X['Is_Morning']
-    X['NetOI_x_Afternoon'] = df['NetOI_Diff'] * X['Is_Afternoon']
-    X['Gap_x_Morning']     = df['Open_Gap']   * X['Is_Morning']
-    X['TSM_x_Afternoon']   = df['TSM_Ret']    * X['Is_Afternoon']
-
-    X['VWAP_x_Morning']    = df['VWAP_Dist']        * X['Is_Morning']
-    X['VWAP_x_Afternoon']  = df['VWAP_Dist']        * X['Is_Afternoon']
-    X['Mom3_x_Afternoon']  = df['Mom3']             * X['Is_Afternoon']
-    X['Ret_x_Afternoon']   = df['Intraday_Ret_Now'] * X['Is_Afternoon']
-    X['Vol_x_Morning']     = df['Vol_Ratio']        * X['Is_Morning']
-
-    # --- Phase 1B: 盤中 RSI（14 bars ≈ 70 分鐘週期）---
-    if 'TradingDate' in df.columns:
-        gains  = df['Bar_Body'].clip(lower=0)
-        losses = (-df['Bar_Body']).clip(lower=0)
-        avg_gain = gains.groupby(df['TradingDate']).transform(lambda s: s.ewm(span=14, min_periods=1).mean())
-        avg_loss = losses.groupby(df['TradingDate']).transform(lambda s: s.ewm(span=14, min_periods=1).mean())
-        X['Intraday_RSI'] = 100 - 100 / (1 + avg_gain / (avg_loss + 1e-9))
-        # 注意: groupby+transform+ewm 在 pandas 中 index alignment 正確，但可透過
-        # X['Intraday_RSI'].groupby(df['TradingDate']).first() 驗證首值約為 50.0
-        X['RSI_Overbought']  = (X['Intraday_RSI'] > 70).astype(float)
-        X['RSI_Oversold']    = (X['Intraday_RSI'] < 30).astype(float)
-
-    # --- Phase 1C: Reversal 信號 ---
-    X['Mom_Divergence'] = df['Mom3'] - df['Mom6']
-
-    # 注意: rolling(5).std() 前 2 個 bar 的 std=NaN → fillna(0)，
-    # 導致開盤前兩根 bar 的 VWAP_Extreme 偏向 1，為已知且可接受的行為
-    vwap_std = df.groupby('TradingDate')['VWAP_Dist'].transform(
-        lambda s: s.rolling(5, min_periods=1).std().fillna(0)
-    )
-    X['VWAP_Extreme']   = (np.abs(df['VWAP_Dist']) > vwap_std).astype(float)
-    X['VWAP_Reversal']  = -df['VWAP_Dist'] * X['VWAP_Extreme']
-
-    X['Near_High'] = (df['Range_Position'] > 0.85).astype(float)
-    X['Near_Low']  = (df['Range_Position'] < 0.15).astype(float)
-
-    # --- Phase 2: OFI 逐筆流量特徵（反轉版：均值回歸假設）---
-    # Trade_Count, Avg_Trade_Size, Large_Trade_Ratio 不涉及方向，保持原值
-    for col in ['Trade_Count', 'Avg_Trade_Size', 'Large_Trade_Ratio']:
-        if col in df.columns:
-            X[col] = df[col]
-
-    # OFI 方向性特徵取負（買壓 → 預期回落）
-    if 'OFI' in df.columns:
-        X['OFI_Rev']         = -df['OFI']          # 反向 OFI
-        X['Cum_OFI_Rev']     = -df['Cum_OFI']      # 反向累計 OFI
-        X['OFI_SMA3_Rev']    = -df['OFI_SMA3']     # 反向 3-bar 均值
-        # 反向 OFI × 時段互動
-        X['OFI_Rev_x_Time']      = -df['OFI'] * df['Time_Progress']
-        X['Cum_OFI_Rev_x_Time']  = -df['Cum_OFI'] * df['Time_Progress']
-        X['OFI_Rev_x_VWAP']      = -df['OFI'] * df['VWAP_Dist']
-        X['OFI_Extreme']         = (np.abs(df['OFI']) > 0.5).astype(float)
-        X['OFI_Rev_x_Morning']   = -df['OFI'] * (df['Time_Progress'] < 0.30)
-        X['OFI_Rev_x_Afternoon'] = -df['OFI'] * (df['Time_Progress'] >= 0.70)
-        X['Log_Trade_Count']     = np.log1p(df['Trade_Count'])
-
     leaky_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points']
     for c in leaky_cols:
         assert c not in X.columns, f"Data leakage detected: {c} in features!"
@@ -238,13 +169,14 @@ def engineer_features(df):
 
 # Direction Classifier (LightGBM)
 DIR_CLF_PARAMS = dict(
-    n_estimators=2000,
-    max_depth=8,
-    num_leaves=255,
-    learning_rate=0.005,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    reg_alpha=2.0,
+    n_estimators=3000,
+    max_depth=6,
+    num_leaves=63,
+    learning_rate=0.003,
+    subsample=0.75,
+    colsample_bytree=0.75,
+    min_child_samples=30,
+    reg_alpha=3.0,
     reg_lambda=15.0,
     bagging_freq=5,
     bagging_fraction=0.7,
@@ -254,13 +186,14 @@ DIR_CLF_PARAMS = dict(
 
 # Remaining Points Regressor (LightGBM)
 PTS_REG_PARAMS = dict(
-    n_estimators=2000,
-    max_depth=8,
-    num_leaves=255,
-    learning_rate=0.005,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    reg_alpha=2.0,
+    n_estimators=3000,
+    max_depth=6,
+    num_leaves=63,
+    learning_rate=0.003,
+    subsample=0.75,
+    colsample_bytree=0.75,
+    min_child_samples=30,
+    reg_alpha=3.0,
     reg_lambda=15.0,
     bagging_freq=5,
     bagging_fraction=0.7,
@@ -382,8 +315,6 @@ def composite_metric(metrics):
 
     - Direction loss:    (1 - AUC)     → 0 is perfect
     - Points loss:       MAE / 100     → normalized by typical move (~50-100 pts)
-
-    Targets are next 3 bar (15-min horizon) direction and points.
 
     Weights:
     - 50% direction (most important for entry signal)
