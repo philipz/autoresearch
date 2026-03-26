@@ -163,7 +163,15 @@ def _compute_intraday_features(kbar_day):
     remaining_ret = (day_close - current_price) / current_price
     remaining_dir = (remaining_ret > 0).astype(int)
     remaining_points = day_close - current_price
-    
+
+    # ── Short-term Targets（未來 3 bar = 15 分鐘）──
+    # shift(-3) 往前看 3 根 bar；最後 3 根 bar 無目標，設為 NaN
+    next3_close = kbar['Close'].shift(-3)
+    next3_ret = (next3_close - current_price) / current_price
+    # 保留 NaN：用 where 避免 (NaN > 0) 轉為 False 而遺失 NaN 標記
+    next3_dir = next3_ret.where(next3_ret.isna(), (next3_ret > 0).astype(float))
+    next3_pts = next3_close - current_price
+
     snapshots = pd.DataFrame({
         'Time': kbar['Time'],
         # Dynamic features
@@ -183,6 +191,10 @@ def _compute_intraday_features(kbar_day):
         'Remaining_Ret': remaining_ret,
         'Remaining_Dir': remaining_dir,
         'Remaining_Points': remaining_points,
+        # Short-term Targets（未來 3 bar = 15 分鐘）
+        'Next3_Ret': next3_ret.values,
+        'Next3_Dir': next3_dir.values,
+        'Next3_Pts': next3_pts.values,
     })
     
     # Exclude the last bar of the day because its Remaining_Ret is trivially zero (current_price == day_close)
@@ -232,7 +244,8 @@ def build_intraday_dataset():
         'Mom3', 'Mom6', 'Cum_Volume', 'Current_Price',
     ]
     static_cols = [c for c in daily.columns if c not in ['Gap_Direction']]
-    target_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points']
+    target_cols = ['Remaining_Ret', 'Remaining_Dir', 'Remaining_Points',
+                   'Next3_Ret', 'Next3_Dir', 'Next3_Pts']
     
     ordered = ['TradingDate', 'Time'] + dynamic_cols + static_cols + target_cols
     # Keep only existing columns

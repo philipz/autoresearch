@@ -72,9 +72,9 @@ def engineer_features(df):
     Returns:
         dict with keys:
             'X': feature matrix
-            'y_dir': target for remaining direction (binary)
-            'y_ret': target for remaining return (regression)
-            'y_pts': target for remaining points (regression)
+            'y_dir': target for next-3-bar direction (binary, 15-min horizon)
+            'y_ret': target for next-3-bar return
+            'y_pts': target for next-3-bar points
     """
     # --- Dynamic features ---
     X = pd.DataFrame(index=df.index)
@@ -218,9 +218,18 @@ def engineer_features(df):
     X.fillna(0, inplace=True)
 
     # --- Targets ---
-    y_dir = df['Remaining_Dir'].copy()
-    y_ret = df['Remaining_Ret'].copy()
-    y_pts = df['Remaining_Points'].copy()
+    # 短期 Target：未來 3 bar（15 分鐘），排除末端 NaN rows
+    if 'Next3_Dir' in df.columns and df['Next3_Dir'].notna().any():
+        valid_mask = df['Next3_Dir'].notna()
+        y_dir = df['Next3_Dir'][valid_mask].copy()
+        y_ret = df['Next3_Ret'][valid_mask].copy()
+        y_pts = df['Next3_Pts'][valid_mask].copy()
+        X = X[valid_mask]
+    else:
+        # Fallback to original targets
+        y_dir = df['Remaining_Dir'].copy()
+        y_ret = df['Remaining_Ret'].copy()
+        y_pts = df['Remaining_Points'].copy()
 
     return {
         'X': X,
@@ -380,6 +389,8 @@ def composite_metric(metrics):
 
     - Direction loss:    (1 - AUC)     → 0 is perfect
     - Points loss:       MAE / 100     → normalized by typical move (~50-100 pts)
+
+    Targets are next 3 bar (15-min horizon) direction and points.
 
     Weights:
     - 50% direction (most important for entry signal)
