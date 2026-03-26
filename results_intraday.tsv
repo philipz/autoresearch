@@ -10,3 +10,6 @@ phase-b	0.368798	0.490286	discard	Phase-B: Next3-bar target(15min), OFI+動態�
 7b2b535	0.553456	0.551555	discard	Phase-B2: OFI反轉(均值回歸), Remaining_Dir target
 a37ff18	0.534614	0.531234	discard	Seg-3: 分時段模型(Morning/Midday/Afternoon)
 dc9c15b	0.725867	0.514580	discard	Morning-Only: 開盤段專用模型(~5k筆), num_leaves=31
+confidence	0.552332	0.533270	diagnostic	信心曲線診斷: 全局模型, Morning=1.0 Midday=0.97 Afternoon=0.27
+conf-mm	0.550133	0.544821	keep	Morning+Midday訓練(排Afternoon), 信心曲線: Morning=0.97 Midday=1.00
+conf-ofi	0.549397	0.543505	keep	Morning+Midday+OFI特徵(最佳配置), MM_AUC=0.5595, 信心曲線穩定
