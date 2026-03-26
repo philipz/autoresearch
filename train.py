@@ -14,8 +14,6 @@ Usage:
 The script prints a final summary with the composite metric (lower is better).
 """
 
-import gc
-import math
 import time
 import warnings
 import numpy as np
