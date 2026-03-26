@@ -167,36 +167,36 @@ def engineer_features(df):
 # B. Model Definition & Hyperparameters (AI: feel free to modify)
 # ---------------------------------------------------------------------------
 
-# Direction Classifier (LightGBM)
+# Direction Classifier (LightGBM) — 針對小資料集 ~5000 筆調整
 DIR_CLF_PARAMS = dict(
-    n_estimators=3000,
-    max_depth=6,
-    num_leaves=63,
-    learning_rate=0.003,
-    subsample=0.75,
-    colsample_bytree=0.75,
-    min_child_samples=30,
-    reg_alpha=3.0,
-    reg_lambda=15.0,
+    n_estimators=1500,
+    max_depth=5,
+    num_leaves=31,
+    learning_rate=0.005,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_samples=20,
+    reg_alpha=1.0,
+    reg_lambda=10.0,
     bagging_freq=5,
-    bagging_fraction=0.7,
+    bagging_fraction=0.8,
     random_state=RANDOM_SEED,
     verbose=-1,
 )
 
-# Remaining Points Regressor (LightGBM)
+# Remaining Points Regressor (LightGBM) — 針對小資料集 ~5000 筆調整
 PTS_REG_PARAMS = dict(
-    n_estimators=3000,
-    max_depth=6,
-    num_leaves=63,
-    learning_rate=0.003,
-    subsample=0.75,
-    colsample_bytree=0.75,
-    min_child_samples=30,
-    reg_alpha=3.0,
-    reg_lambda=15.0,
+    n_estimators=1500,
+    max_depth=5,
+    num_leaves=31,
+    learning_rate=0.005,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_samples=20,
+    reg_alpha=1.0,
+    reg_lambda=10.0,
     bagging_freq=5,
-    bagging_fraction=0.7,
+    bagging_fraction=0.8,
     random_state=RANDOM_SEED,
     verbose=-1,
 )
@@ -211,139 +211,93 @@ N_SPLITS = 5  # TimeSeriesSplit folds
 
 def train_and_evaluate_cv(train_df, val_df):
     """
-    分時段訓練：Morning / Midday / Afternoon 三個獨立 LightGBM 模型。
-    各時段分別做 TimeSeriesSplit CV，最後在 val_df 合併評估。
+    Morning 專用模型：只取 Time_Progress < 0.30 的開盤段訓練與評估。
+    開盤後 90 分鐘（08:45~10:15）是預測力最強的時窗。
     """
-    SEGMENTS = {
-        'morning':   lambda df: df['Time_Progress'] < 0.30,
-        'midday':    lambda df: (df['Time_Progress'] >= 0.30) & (df['Time_Progress'] < 0.70),
-        'afternoon': lambda df: df['Time_Progress'] >= 0.70,
-    }
+    # 只保留 Morning 資料
+    MORNING_CUTOFF = 0.30
+    train_morning = train_df[train_df['Time_Progress'] < MORNING_CUTOFF].copy()
+    val_morning   = val_df[val_df['Time_Progress'] < MORNING_CUTOFF].copy()
 
-    trained_clfs = {}
-    trained_regs = {}
-    cv_dir_auc_all = []
-    cv_pts_mse_all = []
+    print(f"Morning-only data: train={len(train_morning)}, val={len(val_morning)}")
 
-    # ── 各時段訓練 ──
-    for seg_name, seg_mask_fn in SEGMENTS.items():
-        seg_train = train_df[seg_mask_fn(train_df)].copy()
-        if len(seg_train) == 0:
-            print(f"  [{seg_name}] 無訓練資料，跳過")
-            continue
+    train_data = engineer_features(train_morning)
+    val_data   = engineer_features(val_morning)
 
-        seg_data = engineer_features(seg_train)
-        X_seg = seg_data['X']
-        y_dir_seg = seg_data['y_dir']
-        y_pts_seg = seg_data['y_pts']
+    tscv = TimeSeriesSplit(n_splits=N_SPLITS)
+    cv_dir_auc = []
+    cv_pts_mse = []
 
-        print(f"\n[{seg_name.upper()}] {len(X_seg)} snapshots")
-        tscv = TimeSeriesSplit(n_splits=N_SPLITS)
-        seg_auc = []
-        seg_mse = []
+    X_train    = train_data['X']
+    y_dir_train = train_data['y_dir']
+    y_pts_train = train_data['y_pts']
 
-        for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_seg)):
-            clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
-            clf.fit(X_seg.iloc[tr_idx], y_dir_seg.iloc[tr_idx])
-            probs = clf.predict_proba(X_seg.iloc[te_idx])
-            try:
-                auc = roc_auc_score(y_dir_seg.iloc[te_idx], probs[:, 1]) if probs.shape[1] == 2 else 0.5
-            except ValueError:
-                auc = 0.5
-            seg_auc.append(auc)
+    print(f"\nRunning {N_SPLITS}-fold TimeSeriesSplit CV on {len(X_train)} morning snapshots...")
 
-            reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
-            reg.fit(X_seg.iloc[tr_idx], y_pts_seg.iloc[tr_idx])
-            preds = reg.predict(X_seg.iloc[te_idx])
-            seg_mse.append(mean_squared_error(y_pts_seg.iloc[te_idx], preds))
-
-        print(f"  CV AUC: {np.mean(seg_auc):.4f} ± {np.std(seg_auc):.4f}")
-        cv_dir_auc_all.extend(seg_auc)
-        cv_pts_mse_all.extend(seg_mse)
-
-        # 全段訓練資料 final model
-        clf_final = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
-        clf_final.fit(X_seg, y_dir_seg)
-        trained_clfs[seg_name] = clf_final
-
-        reg_final = lgb.LGBMRegressor(**PTS_REG_PARAMS)
-        reg_final.fit(X_seg, y_pts_seg)
-        trained_regs[seg_name] = reg_final
-
-    print(f"\nCV Averages (all segments):")
-    print(f"  Dir AUC: {np.mean(cv_dir_auc_all):.4f} ± {np.std(cv_dir_auc_all):.4f}")
-    print(f"  Pts MSE: {np.mean(cv_pts_mse_all):.2f}")
-
-    # ── Validation 評估（合併各時段預測）──
-    print("\nValidation set evaluation:")
-    val_dir_probs_all = []
-    val_dir_true_all  = []
-    val_pts_preds_all = []
-    val_pts_true_all  = []
-
-    for seg_name, seg_mask_fn in SEGMENTS.items():
-        if seg_name not in trained_clfs:
-            continue
-        seg_val = val_df[seg_mask_fn(val_df)].copy()
-        if len(seg_val) == 0:
-            continue
-
-        seg_data = engineer_features(seg_val)
-        X_val_seg = seg_data['X']
-        y_dir_val = seg_data['y_dir']
-        y_pts_val = seg_data['y_pts']
-
-        dir_probs = trained_clfs[seg_name].predict_proba(X_val_seg)
-        pts_preds = trained_regs[seg_name].predict(X_val_seg)
-
-        val_dir_probs_all.append(dir_probs[:, 1])
-        val_dir_true_all.append(y_dir_val.values)
-        val_pts_preds_all.append(pts_preds)
-        val_pts_true_all.append(y_pts_val.values)
-
-        # 每時段獨立 AUC
+    for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_train)):
+        clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
+        clf.fit(X_train.iloc[tr_idx], y_dir_train.iloc[tr_idx])
+        probs = clf.predict_proba(X_train.iloc[te_idx])
         try:
-            seg_auc = roc_auc_score(y_dir_val, dir_probs[:, 1])
+            auc = roc_auc_score(y_dir_train.iloc[te_idx], probs[:, 1]) if probs.shape[1] == 2 else 0.5
         except ValueError:
-            seg_auc = 0.5
-        seg_acc = accuracy_score(y_dir_val, trained_clfs[seg_name].predict(X_val_seg))
-        seg_mae = mean_absolute_error(y_pts_val, pts_preds)
-        print(f"  [{seg_name:9s}] AUC={seg_auc:.4f}  Acc={seg_acc:.4f}  MAE={seg_mae:.1f}pts")
+            auc = 0.5
+        cv_dir_auc.append(auc)
 
-    # 合併全時段
-    y_dir_all   = np.concatenate(val_dir_true_all)
-    probs_all   = np.concatenate(val_dir_probs_all)
-    y_pts_all   = np.concatenate(val_pts_true_all)
-    pts_pred_all = np.concatenate(val_pts_preds_all)
+        reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
+        reg.fit(X_train.iloc[tr_idx], y_pts_train.iloc[tr_idx])
+        preds = reg.predict(X_train.iloc[te_idx])
+        cv_pts_mse.append(mean_squared_error(y_pts_train.iloc[te_idx], preds))
 
+        print(f"  Fold {fold+1}: AUC={auc:.4f}, MSE={cv_pts_mse[-1]:.2f}")
+
+    print(f"\nCV Averages:")
+    print(f"  Dir AUC: {np.mean(cv_dir_auc):.4f} ± {np.std(cv_dir_auc):.4f}")
+    print(f"  Pts MSE: {np.mean(cv_pts_mse):.2f}")
+
+    # Final models on full morning training set
+    print("\nTraining final models on full morning training set...")
+    dir_clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
+    dir_clf.fit(X_train, y_dir_train)
+
+    pts_reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
+    pts_reg.fit(X_train, y_pts_train)
+
+    # Validation evaluation
+    print("\nValidation set evaluation (Morning only):")
+    X_val      = val_data['X']
+    y_dir_val  = val_data['y_dir']
+    y_pts_val  = val_data['y_pts']
+
+    dir_probs  = dir_clf.predict_proba(X_val)
+    dir_preds  = dir_clf.predict(X_val)
     try:
-        val_dir_auc = roc_auc_score(y_dir_all, probs_all)
+        val_dir_auc = roc_auc_score(y_dir_val, dir_probs[:, 1])
     except ValueError:
         val_dir_auc = 0.5
-    val_dir_acc  = accuracy_score(y_dir_all, (probs_all >= 0.5).astype(int))
-    val_pts_mse  = mean_squared_error(y_pts_all, pts_pred_all)
-    val_pts_mae  = mean_absolute_error(y_pts_all, pts_pred_all)
+    val_dir_acc = accuracy_score(y_dir_val, dir_preds)
+    print(f"  Dir Accuracy: {val_dir_acc:.4f}")
+    print(f"  Dir AUC:      {val_dir_auc:.4f}")
 
-    print(f"\n  [overall   ] AUC={val_dir_auc:.4f}  Acc={val_dir_acc:.4f}  MAE={val_pts_mae:.1f}pts  MSE={val_pts_mse:.2f}")
+    pts_preds  = pts_reg.predict(X_val)
+    val_pts_mse = mean_squared_error(y_pts_val, pts_preds)
+    val_pts_mae = mean_absolute_error(y_pts_val, pts_preds)
+    print(f"  Pts MSE:      {val_pts_mse:.2f}")
+    print(f"  Pts MAE:      {val_pts_mae:.2f} points")
 
-    # Feature importance（用 afternoon 模型，收盤前信號最重要）
-    print("\n[Feature Importance - Afternoon Classifier]")
-    if 'afternoon' in trained_clfs:
-        aft_data = engineer_features(train_df[SEGMENTS['afternoon'](train_df)])
-        feat_names = aft_data['X'].columns.tolist()
-        for feat, imp in sorted(
-            zip(feat_names, trained_clfs['afternoon'].feature_importances_),
-            key=lambda x: -x[1]
-        )[:10]:
-            print(f"  {feat}: {imp:.4f}")
+    # Feature importance
+    print("\n[Feature Importance - Morning Classifier]")
+    feat_names = X_train.columns.tolist()
+    for feat, imp in sorted(zip(feat_names, dir_clf.feature_importances_), key=lambda x: -x[1])[:10]:
+        print(f"  {feat}: {imp:.4f}")
 
     return {
         'val_dir_auc': val_dir_auc,
         'val_dir_acc': val_dir_acc,
         'val_pts_mse': val_pts_mse,
         'val_pts_mae': val_pts_mae,
-        'cv_dir_auc_mean': np.mean(cv_dir_auc_all),
-        'cv_pts_mse_mean': np.mean(cv_pts_mse_all),
+        'cv_dir_auc_mean': np.mean(cv_dir_auc),
+        'cv_pts_mse_mean': np.mean(cv_pts_mse),
     }
 
 
