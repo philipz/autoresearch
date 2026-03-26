@@ -258,6 +258,8 @@ def build_intraday_dataset():
         print(f"合併 OFI 特徵從 {OFI_CACHE_FILE}...")
         ofi = pd.read_csv(OFI_CACHE_FILE)
         result = pd.merge(result, ofi, on=['TradingDate', 'Time'], how='left')
+        ofi_cols = ['OFI', 'Cum_OFI', 'Trade_Count', 'Avg_Trade_Size',
+                    'Large_Trade_Ratio', 'OFI_SMA3']
         if 'OFI' in result.columns:
             # Count actual matches (non-NaN before fillna)
             matched_count = result['OFI'].count()

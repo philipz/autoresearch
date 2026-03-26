@@ -88,8 +88,8 @@ def engineer_features(df):
     X['Ret_abs'] = np.abs(df['Intraday_Ret_Now'])
     X['Open_Gap_sq'] = df['Open_Gap'] ** 2
     X['Open_Gap_abs'] = np.abs(df['Open_Gap'])
-    X['Log_Vol_Ratio'] = np.log1p(df['Vol_Ratio'])
-    X['Sqrt_Vol_Ratio'] = np.sqrt(df['Vol_Ratio'])
+    X['Log_Vol_Ratio'] = np.log1p(df['Vol_Ratio'].clip(lower=0))
+    X['Sqrt_Vol_Ratio'] = np.sqrt(df['Vol_Ratio'].clip(lower=0))
 
     # Static features
     X['TSM_Ret'] = df['TSM_Ret']
@@ -322,9 +322,9 @@ def train_and_evaluate_cv(train_df, val_df):
         print(f"  {seg_name:<30} {excess:>10.4f} {conf:>10.2f}  {advice}")
 
     # 動態產生信心建議（基於實測數據，非硬編碼）
-    morning_conf = conf_scores.get('Morning', 0.0)
-    midday_conf  = conf_scores.get('Midday', 0.0)
-    afternoon_conf = conf_scores.get('Afternoon', 0.0)
+    morning_conf = conf_scores.get('Morning  (0.00~0.30)', 0.0)
+    midday_conf  = conf_scores.get('Midday   (0.30~0.70)', 0.0)
+    afternoon_conf = conf_scores.get('Afternoon(0.70~1.00)', 0.0)
     print("\n  實作建議：prediction_confidence = f(Time_Progress)")
     print(f"    if Time_Progress < {MORNING_CUTOFF:.2f}:  confidence = {morning_conf:.2f}  (Morning)")
     print(f"    if Time_Progress < {AFTERNOON_CUTOFF:.2f}:  confidence = {midday_conf:.2f}  (Midday)")
