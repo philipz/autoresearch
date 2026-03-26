@@ -213,30 +213,43 @@ def train_and_evaluate_cv(train_df, val_df):
     train_data = engineer_features(train_active)
     val_data   = engineer_features(val_df)
 
-    tscv = TimeSeriesSplit(n_splits=N_SPLITS)
-    cv_dir_auc = []
-    cv_pts_mse = []
-
     X_train     = train_data['X']
     y_dir_train = train_data['y_dir']
     y_pts_train = train_data['y_pts']
 
-    print(f"\nRunning {N_SPLITS}-fold TimeSeriesSplit CV on {len(X_train)} snapshots...")
+    print(f"\nRunning {N_SPLITS}-fold Date-Aware TimeSeriesSplit CV...")
+    
+    unique_dates = train_active['TradingDate'].unique()
+    tscv = TimeSeriesSplit(n_splits=N_SPLITS)
+    
+    cv_dir_auc = []
+    cv_pts_mse = []
 
-    for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_train)):
+    for fold, (tr_date_idx, te_date_idx) in enumerate(tscv.split(unique_dates)):
+        tr_dates = unique_dates[tr_date_idx]
+        te_dates = unique_dates[te_date_idx]
+        
+        tr_mask = train_active['TradingDate'].isin(tr_dates)
+        te_mask = train_active['TradingDate'].isin(te_dates)
+        
+        X_tr, y_dir_tr, y_pts_tr = X_train[tr_mask], y_dir_train[tr_mask], y_pts_train[tr_mask]
+        X_te, y_dir_te, y_pts_te = X_train[te_mask], y_dir_train[te_mask], y_pts_train[te_mask]
+
         clf = lgb.LGBMClassifier(**DIR_CLF_PARAMS)
-        clf.fit(X_train.iloc[tr_idx], y_dir_train.iloc[tr_idx])
-        probs = clf.predict_proba(X_train.iloc[te_idx])
+        clf.fit(X_tr, y_dir_tr)
+        probs = clf.predict_proba(X_te)
         try:
-            auc = roc_auc_score(y_dir_train.iloc[te_idx], probs[:, 1]) if probs.shape[1] == 2 else 0.5
+            auc = roc_auc_score(y_dir_te, probs[:, 1]) if probs.shape[1] == 2 else 0.5
         except ValueError:
             auc = 0.5
         cv_dir_auc.append(auc)
 
         reg = lgb.LGBMRegressor(**PTS_REG_PARAMS)
-        reg.fit(X_train.iloc[tr_idx], y_pts_train.iloc[tr_idx])
-        preds = reg.predict(X_train.iloc[te_idx])
-        cv_pts_mse.append(mean_squared_error(y_pts_train.iloc[te_idx], preds))
+        reg.fit(X_tr, y_pts_tr)
+        preds = reg.predict(X_te)
+        cv_pts_mse.append(mean_squared_error(y_pts_te, preds))
+        
+        print(f"  Fold {fold+1}: n_train_dates={len(tr_dates)}, n_val_dates={len(te_dates)}, AUC={auc:.4f}")
 
         print(f"  Fold {fold+1}: AUC={auc:.4f}, MSE={cv_pts_mse[-1]:.2f}")
 
