@@ -5,3 +5,4 @@ b22abbb	0.565210	0.553506	discard	Exp 26: Vol_Adj_Mom, Lambda=15.0 (Failed AUC)
 58f38ef	0.550497	0.548979	discard	Phase1: 時段+RSI+Reversal, num_leaves=63
 fc63352	0.559211	0.550149	discard	Phase1b: 時段+RSI+Reversal, 原版超參數
 71e4319	0.552862	0.550639	discard	Phase2: OFI+Cum_OFI+互動項
+7b2b535	0.566810	0.471771	diagnostic	Diag-C: 純動態特徵（無靜態）
