@@ -14,12 +14,6 @@ Usage:
 The script prints a final summary with the composite metric (lower is better).
 """
 
-import os
-os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-
-import gc
-import math
 import time
 import warnings
 import numpy as np
@@ -130,10 +124,6 @@ INTRA_REG_PARAMS = dict(
 # Cross-validation
 N_SPLITS = 5  # TimeSeriesSplit folds
 
-    # Fast fail: abort if loss is exploding or NaN
-    if math.isnan(train_loss_f) or train_loss_f > 100:
-        print("FAIL")
-        exit(1)
 
 # ---------------------------------------------------------------------------
 # C. Training & Evaluation (AI: feel free to modify)
@@ -286,7 +276,6 @@ def composite_metric(metrics):
 
     composite = w_clf * gap_clf_loss + w_gap * gap_reg_loss + w_intra * intra_loss
     return composite
-
 
 # ---------------------------------------------------------------------------
 # Main execution
