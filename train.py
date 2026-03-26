@@ -14,6 +14,12 @@ Usage:
 The script prints a final summary with the composite metric (lower is better).
 """
 
+Usage:
+    python train.py
+
+The script prints a final summary with the composite metric (lower is better).
+"""
+
 import gc
 import math
 import time
@@ -284,6 +290,183 @@ def composite_metric(metrics):
 # Main execution
 # ---------------------------------------------------------------------------
 
+# Gap Value Regressor
+GAP_REG_PARAMS = dict(
+    n_estimators=300,
+    max_depth=5,
+    min_samples_split=10,
+    random_state=RANDOM_SEED,
+)
+
+# Intraday Return Regressor
+INTRA_REG_PARAMS = dict(
+    n_estimators=300,
+    max_depth=5,
+    min_samples_split=10,
+    random_state=RANDOM_SEED,
+)
+
+# Cross-validation
+N_SPLITS = 5  # TimeSeriesSplit folds
+
+    # Fast fail: abort if loss is exploding or NaN
+    if math.isnan(train_loss_f) or train_loss_f > 100:
+        print("FAIL")
+        exit(1)
+
+# ---------------------------------------------------------------------------
+# C. Training & Evaluation (AI: feel free to modify)
+# ---------------------------------------------------------------------------
+
+def train_and_evaluate_cv(train_df, val_df):
+    """
+    Train models with TimeSeriesSplit cross-validation on train_df,
+    then evaluate on val_df for the final metrics.
+
+    Returns:
+        dict with metric values
+    """
+    # Combine train+val for CV, then final eval on val
+    train_data = engineer_features(train_df)
+    val_data = engineer_features(val_df)
+
+    # --- Cross-Validation on training set ---
+    tscv = TimeSeriesSplit(n_splits=N_SPLITS)
+
+    cv_gap_auc = []
+    cv_gap_mae = []
+    cv_intra_mse = []
+
+    X_gap_train = train_data['X_gap']
+    y_gap_dir_train = train_data['y_gap_dir']
+    y_gap_val_train = train_data['y_gap_val']
+    X_intra_train = train_data['X_intra']
+    y_intra_train = train_data['y_intra']
+
+    print(f"\nRunning {N_SPLITS}-fold TimeSeriesSplit CV...")
+
+    for fold, (tr_idx, te_idx) in enumerate(tscv.split(X_gap_train)):
+        # Gap Classifier
+        clf = RandomForestClassifier(**GAP_CLF_PARAMS)
+        clf.fit(X_gap_train.iloc[tr_idx], y_gap_dir_train.iloc[tr_idx])
+        probs = clf.predict_proba(X_gap_train.iloc[te_idx])
+        if probs.shape[1] == 2:
+            try:
+                auc = roc_auc_score(y_gap_dir_train.iloc[te_idx], probs[:, 1])
+            except ValueError:
+                auc = 0.5  # degenerate case
+        else:
+            auc = 0.5
+        cv_gap_auc.append(auc)
+
+        # Gap Regressor
+        reg = RandomForestRegressor(**GAP_REG_PARAMS)
+        reg.fit(X_gap_train.iloc[tr_idx], y_gap_val_train.iloc[tr_idx])
+        preds = reg.predict(X_gap_train.iloc[te_idx])
+        mae = mean_absolute_error(y_gap_val_train.iloc[te_idx], preds)
+        cv_gap_mae.append(mae)
+
+        # Intraday Regressor
+        intra = RandomForestRegressor(**INTRA_REG_PARAMS)
+        intra.fit(X_intra_train.iloc[tr_idx], y_intra_train.iloc[tr_idx])
+        intra_preds = intra.predict(X_intra_train.iloc[te_idx])
+        mse = mean_squared_error(y_intra_train.iloc[te_idx], intra_preds)
+        cv_intra_mse.append(mse)
+
+        print(f"  Fold {fold+1}: AUC={auc:.4f}, MAE={mae:.2f}, MSE={mse:.8f}")
+
+    print(f"\nCV Averages:")
+    print(f"  Gap AUC:     {np.mean(cv_gap_auc):.4f} ± {np.std(cv_gap_auc):.4f}")
+    print(f"  Gap MAE:     {np.mean(cv_gap_mae):.2f} ± {np.std(cv_gap_mae):.2f}")
+    print(f"  Intra MSE:   {np.mean(cv_intra_mse):.8f} ± {np.std(cv_intra_mse):.8f}")
+
+    # --- Final models trained on full training set ---
+    print("\nTraining final models on full training set...")
+
+    gap_clf = RandomForestClassifier(**GAP_CLF_PARAMS)
+    gap_clf.fit(X_gap_train, y_gap_dir_train)
+
+    gap_reg = RandomForestRegressor(**GAP_REG_PARAMS)
+    gap_reg.fit(X_gap_train, y_gap_val_train)
+
+    intra_reg = RandomForestRegressor(**INTRA_REG_PARAMS)
+    intra_reg.fit(X_intra_train, y_intra_train)
+
+    # --- Validation set evaluation ---
+    print("\nValidation set evaluation:")
+
+    X_gap_val = val_data['X_gap']
+    y_gap_dir_val = val_data['y_gap_dir']
+    y_gap_val_val = val_data['y_gap_val']
+    X_intra_val = val_data['X_intra']
+    y_intra_val = val_data['y_intra']
+
+    # Gap Classifier
+    gap_probs = gap_clf.predict_proba(X_gap_val)
+    gap_preds = gap_clf.predict(X_gap_val)
+    try:
+        val_gap_auc = roc_auc_score(y_gap_dir_val, gap_probs[:, 1])
+    except ValueError:
+        val_gap_auc = 0.5
+    val_gap_acc = accuracy_score(y_gap_dir_val, gap_preds)
+    print(f"  Gap Accuracy: {val_gap_acc:.4f}")
+    print(f"  Gap AUC:      {val_gap_auc:.4f}")
+
+    # Gap Regressor
+    gap_val_preds = gap_reg.predict(X_gap_val)
+    val_gap_mae = mean_absolute_error(y_gap_val_val, gap_val_preds)
+    print(f"  Gap MAE:      {val_gap_mae:.2f} points")
+
+    # Intraday Regressor
+    intra_val_preds = intra_reg.predict(X_intra_val)
+    val_intra_mse = mean_squared_error(y_intra_val, intra_val_preds)
+    val_intra_mae = mean_absolute_error(y_intra_val, intra_val_preds)
+    print(f"  Intra MSE:    {val_intra_mse:.8f}")
+    print(f"  Intra MAE:    {val_intra_mae:.6f}")
+
+    return {
+        'val_gap_auc': val_gap_auc,
+        'val_gap_acc': val_gap_acc,
+        'val_gap_mae': val_gap_mae,
+        'val_intra_mse': val_intra_mse,
+        'val_intra_mae': val_intra_mae,
+        'cv_gap_auc_mean': np.mean(cv_gap_auc),
+        'cv_gap_mae_mean': np.mean(cv_gap_mae),
+        'cv_intra_mse_mean': np.mean(cv_intra_mse),
+    }
+
+
+# ---------------------------------------------------------------------------
+# D. Composite Metric (AI: feel free to modify weights/formula)
+# ---------------------------------------------------------------------------
+
+def composite_metric(metrics):
+    """
+    Compute a single "north star" metric from individual model metrics.
+    LOWER IS BETTER.
+
+    Current formula: weighted sum of normalized losses.
+      - Gap classification loss: (1 - AUC)       range [0, 0.5]
+      - Gap regression loss:     MAE / 100        normalized by typical gap magnitude
+      - Intraday MSE:            MSE * 10000      scaled for readability
+
+    Weights reflect trading strategy priorities:
+      - 30% gap direction (affects position direction)
+      - 30% gap magnitude (affects position size)
+      - 40% intraday trend (affects intraday management)
+    """
+    gap_clf_loss = 1.0 - metrics['val_gap_auc']
+    gap_reg_loss = metrics['val_gap_mae'] / 100.0
+    intra_loss = metrics['val_intra_mse'] * 10000.0
+
+    w_clf = 0.3
+    w_gap = 0.3
+    w_intra = 0.4
+
+    composite = w_clf * gap_clf_loss + w_gap * gap_reg_loss + w_intra * intra_loss
+    return composite
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("Autoresearch Sandbox — Training")
@@ -320,99 +503,40 @@ if __name__ == "__main__":
     print(f"val_rows:         {len(val_df)}")
     
 # ---------------------------------------------------------------------------
-# Training loop
+# Main execution
 # ---------------------------------------------------------------------------
 
-t_start_training = time.time()
-smooth_train_loss = 0
-total_training_time = 0
-step = 0
+if __name__ == "__main__":
+    print("=" * 60)
+    print("Autoresearch Sandbox — Training")
+    print("=" * 60)
 
-while True:
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for micro_step in range(grad_accum_steps):
-        with autocast_ctx:
-            loss = model(x, y)
-        train_loss = loss.detach()
-        loss = loss / grad_accum_steps
-        loss.backward()
-        x, y, epoch = next(train_loader)
+    t_train_start = time.time()
 
-    # Progress and schedules
-    progress = min(total_training_time / TIME_BUDGET, 1.0)
-    lrm = get_lr_multiplier(progress)
-    muon_momentum = get_muon_momentum(step)
-    muon_weight_decay = get_weight_decay(progress)
-    for group in optimizer.param_groups:
-        group["lr"] = group["initial_lr"] * lrm
-        if group['kind'] == 'muon':
-            group["momentum"] = muon_momentum
-            group["weight_decay"] = muon_weight_decay
-    optimizer.step()
-    model.zero_grad(set_to_none=True)
+    # Run training and evaluation
+    metrics = train_and_evaluate_cv(train_df, val_df)
 
-    train_loss_f = train_loss.item()
+    # Compute composite metric
+    score = composite_metric(metrics)
 
-    # Fast fail: abort if loss is exploding or NaN
-    if math.isnan(train_loss_f) or train_loss_f > 100:
-        print("FAIL")
-        exit(1)
+    t_end = time.time()
+    training_time = t_end - t_train_start
+    total_time = t_end - t_start
 
-    torch.cuda.synchronize()
-    t1 = time.time()
-    dt = t1 - t0
-
-    if step > 10:
-        total_training_time += dt
-
-    # Logging
-    ema_beta = 0.9
-    smooth_train_loss = ema_beta * smooth_train_loss + (1 - ema_beta) * train_loss_f
-    debiased_smooth_loss = smooth_train_loss / (1 - ema_beta**(step + 1))
-    pct_done = 100 * progress
-    tok_per_sec = int(TOTAL_BATCH_SIZE / dt)
-    mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE / dt / H100_BF16_PEAK_FLOPS
-    remaining = max(0, TIME_BUDGET - total_training_time)
-
-    print(f"\rstep {step:05d} ({pct_done:.1f}%) | loss: {debiased_smooth_loss:.6f} | lrm: {lrm:.2f} | dt: {dt*1000:.0f}ms | tok/sec: {tok_per_sec:,} | mfu: {mfu:.1f}% | epoch: {epoch} | remaining: {remaining:.0f}s    ", end="", flush=True)
-
-    # GC management (Python's GC causes ~500ms stalls)
-    if step == 0:
-        gc.collect()
-        gc.freeze()
-        gc.disable()
-    elif (step + 1) % 5000 == 0:
-        gc.collect()
-
-    step += 1
-
-    # Time's up — but only stop after warmup steps so we don't count compilation
-    if step > 10 and total_training_time >= TIME_BUDGET:
-        break
-
-print()  # newline after \r training log
-
-total_tokens = step * TOTAL_BATCH_SIZE
-
-# Final eval
-model.eval()
-with autocast_ctx:
-    val_bpb = evaluate_bpb(model, tokenizer, DEVICE_BATCH_SIZE)
-
-# Final summary
-t_end = time.time()
-startup_time = t_start_training - t_start
-steady_state_mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE * (step - 10) / total_training_time / H100_BF16_PEAK_FLOPS if total_training_time > 0 else 0
-peak_vram_mb = torch.cuda.max_memory_allocated() / 1024 / 1024
-
-print("---")
-print(f"val_bpb:          {val_bpb:.6f}")
-print(f"training_seconds: {total_training_time:.1f}")
-print(f"total_seconds:    {t_end - t_start:.1f}")
-print(f"peak_vram_mb:     {peak_vram_mb:.1f}")
-print(f"mfu_percent:      {steady_state_mfu:.2f}")
-print(f"total_tokens_M:   {total_tokens / 1e6:.1f}")
-print(f"num_steps:        {step}")
-print(f"num_params_M:     {num_params / 1e6:.1f}")
-print(f"depth:            {DEPTH}")
+    # --- Final summary (parsed by autoresearch loop) ---
+    print()
+    print("---")
+    print(f"composite_score:  {score:.6f}")
+    print(f"val_gap_auc:      {metrics['val_gap_auc']:.6f}")
+    print(f"val_gap_acc:      {metrics['val_gap_acc']:.6f}")
+    print(f"val_gap_mae:      {metrics['val_gap_mae']:.2f}")
+    print(f"val_intra_mse:    {metrics['val_intra_mse']:.8f}")
+    print(f"val_intra_mae:    {metrics['val_intra_mae']:.6f}")
+    print(f"cv_gap_auc_mean:  {metrics['cv_gap_auc_mean']:.6f}")
+    print(f"cv_gap_mae_mean:  {metrics['cv_gap_mae_mean']:.2f}")
+    print(f"cv_intra_mse_mean:{metrics['cv_intra_mse_mean']:.8f}")
+    print(f"training_seconds: {training_time:.1f}")
+    print(f"total_seconds:    {total_time:.1f}")
+    print(f"n_splits:         {N_SPLITS}")
+    print(f"train_rows:       {len(train_df)}")
+    print(f"val_rows:         {len(val_df)}")

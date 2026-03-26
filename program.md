@@ -127,6 +127,16 @@ LOOP FOREVER:
 8. If val_bpb improved (lower), you "advance" the branch, keeping the git commit
 9. If val_bpb is equal or worse, you git reset back to where you started
 
+## Research directions to explore
+
+Here are promising avenues, roughly ordered by expected impact:
+
+### High Priority
+- **Feature interactions**: Try `TSM_Ret * SOX_Ret`, `TSM_Ret / SOX_Ret`, quadratic terms
+- **Lagged features**: Add `TSM_Ret_lag2`, `SOX_Ret_lag2` (2-day lookback)
+- **Rolling statistics**: 5-day, 10-day rolling mean/std of returns
+- **Cross-model features**: Use gap prediction as input feature for intraday model
+
 ### Medium Priority
 - **Model ensembles**: Combine GradientBoosting + RandomForest predictions
 - **Hyperparameter tuning**: Grid/random search over key parameters
