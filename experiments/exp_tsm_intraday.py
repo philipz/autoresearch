@@ -69,7 +69,9 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
         day_high = grp['High'].expanding().max()
         day_low  = grp['Low'].expanding().min()
         cum_vol  = grp['Volume'].cumsum()
-        vwap     = (grp['Close'] * grp['Volume']).cumsum() / cum_vol.replace(0, np.nan)
+        # 案 1:1 還原生產邏輯：VWAP 使用 Typical Price (H+L+C)/3
+        typical_p = (grp['High'] + grp['Low'] + grp['Close']) / 3.0
+        vwap     = (typical_p * grp['Volume']).cumsum() / cum_vol.replace(0, np.nan)
 
         # 向量化計算
         session_start = pd.Timestamp(str(date.date()) + ' 08:45:00')
@@ -149,7 +151,7 @@ def fetch_tsm_features() -> pd.DataFrame:
         df.index = df.index.tz_convert('Asia/Taipei')
 
         for date, grp in df.groupby(df.index.date):
-            grp = grp.sort_values(df.index.name if df.index.name else 'Datetime')
+            grp = grp.sort_index()
             open_price = grp['Open'].iloc[0]
             if open_price == 0:
                 continue

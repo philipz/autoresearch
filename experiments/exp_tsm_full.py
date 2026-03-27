@@ -312,7 +312,10 @@ def main():
         a = results[0][seg]
         b = results[1][seg]
         d = b - a
-        print(f"  {label:<12} {a:>10.4f} {b:>10.4f} {d:>+8.4f}")
+        a_str = f"{a:>10.4f}" if not np.isnan(a) else f"{'nan':>10}"
+        b_str = f"{b:>10.4f}" if not np.isnan(b) else f"{'nan':>10}"
+        d_str = f"{d:>+8.4f}" if not np.isnan(d) else f"{'nan':>8}"
+        print(f"  {label:<12} {a_str} {b_str} {d_str}")
 
 
 if __name__ == '__main__':

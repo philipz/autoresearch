@@ -47,7 +47,7 @@ VAL_RATIO = 0.15
 FEATURE_COLS = [
     'TSM_Ret',          # TSMC ADR log return (T-1, shifted)
     'SOX_Ret',          # Philadelphia Semiconductor Index log return (T-1, shifted)
-    'NetOI_Diff',       # FINI Net OI daily change (T-1, shifted in prepare)
+    'NetOI_Diff_lag1',  # FINI Net OI daily change (T-1, provided by DataPreprocessor)
     'Open_Gap',         # Open - Previous Close (points)
     'Intraday_Ret',     # Log(Close / Open) — intraday log return
     'Intraday_Point',   # Close - Open (points)
@@ -91,11 +91,8 @@ def _fetch_and_prepare():
         print("ERROR: No data returned from DataPreprocessor!")
         sys.exit(1)
 
-    # CRITICAL: Shift NetOI_Diff by 1 day to prevent data leakage
-    # NetOI_Diff is from end-of-day reports; for pre-market prediction
-    # we can only use yesterday's value.
-    if 'NetOI_Diff' in df.columns:
-        df['NetOI_Diff'] = df['NetOI_Diff'].shift(1)
+    # DataPreprocessor already handles NetOI_Diff shifting and naming it _lag1.
+    # The shift(1) logic here was redundant and used an old column name.
 
     # Drop rows with NaN after shift
     df = df.dropna()
