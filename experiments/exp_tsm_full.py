@@ -88,6 +88,8 @@ def resample_to_5m(raw: pd.DataFrame) -> pd.DataFrame:
             }, inplace=True)
             records.append(grp5)
 
+    if not records:
+        return pd.DataFrame()
     df5 = pd.concat(records, ignore_index=True)
     print(f"2330 5m resampled: {len(df5):,} rows, {df5['TradingDate'].nunique()} days")
     return df5
@@ -106,8 +108,9 @@ def compute_tsm_features(df5: pd.DataFrame) -> pd.DataFrame:
         prev_closes = closes.shift(1).fillna(closes.iloc[0])
         grp['TSM_5m_Ret'] = np.where(prev_closes != 0, (closes - prev_closes) / prev_closes, 0.0)
         
-        closes_lag3 = closes.shift(3).fillna(closes.iloc[0])
+        closes_lag3 = closes.shift(3)
         grp['TSM_Mom3'] = (closes - closes_lag3) / open_p
+        grp['TSM_Mom3'].iloc[:3] = 0.0  # 案 1:1 還原：前 3 根為 0
         
         avg_vols = vols.rolling(window=20, min_periods=1).mean()
         grp['TSM_Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)

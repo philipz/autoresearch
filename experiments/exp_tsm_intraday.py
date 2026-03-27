@@ -93,8 +93,10 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
         grp['Bar_Body']  = (grp['Close'] - grp['Open']) / open_price
         grp['Bar_Range'] = (grp['High']  - grp['Low'])  / open_price
         
-        grp['Mom3'] = (closes - closes.shift(3).fillna(closes.iloc[0])) / open_price
-        grp['Mom6'] = (closes - closes.shift(6).fillna(closes.iloc[0])) / open_price
+        grp['Mom3'] = (closes - closes.shift(3)) / open_price
+        grp['Mom6'] = (closes - closes.shift(6)) / open_price
+        grp['Mom3'].iloc[:3] = 0.0
+        grp['Mom6'].iloc[:6] = 0.0
         
         remaining_close = closes.iloc[-1]
         grp['Remaining_Ret'] = (remaining_close - closes) / closes
@@ -112,6 +114,8 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
             'Remaining_Ret', 'Remaining_Dir'
         ]])
 
+    if not results:
+        return pd.DataFrame()
     df = pd.concat(results, ignore_index=True)
     # Exclude last bar (no remaining return)
     df = df[df['Time'] < '13:45'].copy()
@@ -159,8 +163,8 @@ def fetch_tsm_features() -> pd.DataFrame:
             prev_closes = closes.shift(1).fillna(closes.iloc[0])
             grp['5m_Ret'] = np.where(prev_closes != 0, (closes - prev_closes) / prev_closes, 0.0)
             
-            closes_lag3 = closes.shift(3).fillna(closes.iloc[0])
-            grp['Mom3'] = (closes - closes_lag3) / open_price
+            grp['Mom3'] = (closes - closes.shift(3)) / open_price
+            grp['Mom3'].iloc[:3] = 0.0
             
             avg_vols = vols.rolling(window=20, min_periods=1).mean()
             grp['Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)
