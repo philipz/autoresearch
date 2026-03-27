@@ -47,6 +47,19 @@ t_start = time.time()
 # ---------------------------------------------------------------------------
 train_df, val_df, _ = get_intraday_data()
 
+# 檢查關鍵特徵是否存在，避免無聲降級 (Silent Degradation)
+def check_feature_availability(df):
+    missing_groups = []
+    if 'TSM_Intraday_Ret' not in df.columns: missing_groups.append("TSM 盤中特徵")
+    if 'OFI' not in df.columns: missing_groups.append("OFI 逐筆流量特徵")
+    if 'TX_Vol5' not in df.columns: missing_groups.append("市場機制 Lag 特徵 (TX_Vol5/Mom5/...)")
+    
+    if missing_groups:
+        print(f"\n[!] 警告：部分特徵群組缺失，模型將以降級模式運行：{', '.join(missing_groups)}")
+        print("    請確認已執行相關準備腳本並更新快存快取檔案 (.cache/*.csv)。\n")
+
+check_feature_availability(train_df)
+
 def engineer_features(df):
     """
     Transform raw snapshot features into model-ready features.
@@ -60,6 +73,11 @@ def engineer_features(df):
             'y_pts': target for remaining points (regression)
     """
     X = pd.DataFrame(index=df.index)
+
+    # 欄位相容性：NetOI_Diff 在新版 prepared_data.csv 改名為 NetOI_Diff_lag1
+    if 'NetOI_Diff' not in df.columns and 'NetOI_Diff_lag1' in df.columns:
+        df = df.copy()
+        df['NetOI_Diff'] = df['NetOI_Diff_lag1']
 
     # Core dynamic signals
     X['Intraday_Ret_Now'] = df['Intraday_Ret_Now']
@@ -119,6 +137,64 @@ def engineer_features(df):
     X['Ret_Persistence'] = df.groupby('TradingDate')['Intraday_Ret_Now'].transform(lambda x: x.rolling(3).sum().fillna(0))
     X['NetOI_x_Gap'] = df['NetOI_Diff'] * df['Open_Gap']
 
+    # --- Exp-A: 市場動能 + Lag 特徵 ---
+    # 5日波動度 & 動能（市場機制識別）
+    if 'TX_Vol5' in df.columns:
+        X['TX_Vol5'] = df['TX_Vol5']
+        X['Vol5_x_Ret'] = df['TX_Vol5'] * df['Intraday_Ret_Now']   # 高波動時報酬信號放大
+        X['Vol5_x_Time'] = df['TX_Vol5'] * df['Time_Progress']
+    if 'TX_Mom5' in df.columns:
+        X['TX_Mom5'] = df['TX_Mom5']
+        X['Mom5_x_Gap'] = df['TX_Mom5'] * df['Open_Gap']           # 趨勢 × 跳空
+    if 'TX_Ret_lag1' in df.columns:
+        X['TX_Ret_lag1'] = df['TX_Ret_lag1']
+    # 法人籌碼動能：當日方向 vs 前日方向
+    if 'NetOI_Diff_lag2' in df.columns:
+        X['NetOI_Momentum'] = df['NetOI_Diff'] - df['NetOI_Diff_lag2']  # 籌碼加速/減速
+    # 隔夜信號滯後：TSM & SOX 2日前
+    if 'TSM_Ret_lag2' in df.columns:
+        X['TSM_Ret_lag2'] = df['TSM_Ret_lag2']
+    if 'SOX_Ret_lag2' in df.columns:
+        X['SOX_Ret_lag2'] = df['SOX_Ret_lag2']
+    # 前日 vs 前前日盤中報酬（串行慣性）
+    if 'Intra_Ret_lag1' in df.columns:
+        X['Intra_Ret_lag1'] = df['Intra_Ret_lag1']
+
+    # --- Exp-B: 微結構特徵 ---
+    if 'Trade_Count' in df.columns:
+        X['Trade_Count'] = np.log1p(df['Trade_Count'].clip(lower=0))
+        X['Trade_Count_x_Time'] = X['Trade_Count'] * df['Time_Progress']
+    if 'Avg_Trade_Size' in df.columns:
+        X['Avg_Trade_Size'] = np.log1p(df['Avg_Trade_Size'].clip(lower=0))
+        # 大單比例 proxy：平均單量 × 成交量比率
+        X['Size_x_Vol'] = X['Avg_Trade_Size'] * df['Vol_Ratio']
+
+    # --- Exp-D: 跨資產動能 & 法人籌碼互動 ---
+    # 波動機制下的法人淨買信號
+    if 'TX_Vol5' in df.columns and 'NetOI_Diff' in df.columns:
+        X['NetOI_x_Vol5'] = df['NetOI_Diff'] * df['TX_Vol5']
+    # TSM ADR × SOX 同向/背離
+    if 'TSM_Ret_lag2' in df.columns and 'SOX_Ret_lag2' in df.columns:
+        X['TSM_SOX_Spread_lag2'] = df['TSM_Ret_lag2'] - df['SOX_Ret_lag2']
+    # TX 5日動能與今日跳空共振
+    if 'TX_Mom5' in df.columns:
+        X['Mom5_x_NetOI'] = df['TX_Mom5'] * df['NetOI_Diff']
+    # 盤中報酬 × 前日報酬慣性（延續 vs 反轉信號）
+    if 'Intra_Ret_lag1' in df.columns:
+        X['Intra_Inertia'] = df['Intraday_Ret_Now'] * df['Intra_Ret_lag1']
+
+
+
+
+    # --- TSM 盤中特徵（2330.TW 5m K，由 scripts/prepare_tsm_features.py 產生）---
+    if 'TSM_Intraday_Ret' in df.columns:
+        X['TSM_Intraday_Ret'] = df['TSM_Intraday_Ret']
+        X['TSM_5m_Ret']       = df['TSM_5m_Ret']
+        X['TSM_Mom3']         = df['TSM_Mom3']
+        X['TSM_Vol_Ratio']    = df['TSM_Vol_Ratio']
+        # 相對強弱：台積電 vs 台指期（法人輪動信號）
+        X['TSM_vs_TX'] = df['TSM_Intraday_Ret'] - df['Intraday_Ret_Now']
+
     # --- OFI 逐筆流量特徵 ---
     if 'OFI' in df.columns:
         X['OFI'] = df['OFI']
@@ -170,7 +246,7 @@ DIR_CLF_PARAMS = dict(
     verbose=-1,
 )
 
-# Remaining Points Regressor (LightGBM) — Morning+Midday ~12k 筆
+# Remaining Points Regressor (LightGBM)
 PTS_REG_PARAMS = dict(
     n_estimators=1500,
     max_depth=5,

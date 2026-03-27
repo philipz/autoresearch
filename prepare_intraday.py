@@ -44,6 +44,7 @@ DAILY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'prepared_d
 SENTIMENT_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'sentiment_cache.csv')
 INTRADAY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'intraday_snapshots.csv')
 OFI_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'ofi_features.csv')
+TSM_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'tsm_5m_features.csv')
 
 # Data split
 TRAIN_RATIO = 0.70
@@ -279,6 +280,23 @@ def build_intraday_dataset():
     else:
         print("WARNING: OFI cache 不存在，跳過 OFI 特徵。")
 
+    # --- 合併 TSM 盤中特徵（若 cache 存在）---
+    if os.path.exists(TSM_CACHE_FILE):
+        print(f"合併 TSM 特徵從 {TSM_CACHE_FILE}...")
+        tsm = pd.read_csv(TSM_CACHE_FILE)
+        result = pd.merge(result, tsm, on=['TradingDate', 'Time'], how='left')
+        tsm_cols = ['TSM_5m_Ret', 'TSM_Intraday_Ret', 'TSM_Mom3', 'TSM_Vol_Ratio']
+        # Count actual matches (non-NaN before fillna)
+        matched = result['TSM_5m_Ret'].count() if 'TSM_5m_Ret' in result.columns else 0
+        for col in tsm_cols:
+            if col in result.columns:
+                result[col] = result[col].fillna(0.0)
+        print(f"TSM 合併完成，匹配行數: {matched}/{len(result)}")
+        if matched == 0:
+            print("WARNING: TSM 匹配數為 0，請檢查 Time 欄位格式是否一致（預期 HH:MM:SS）。")
+    else:
+        print("WARNING: TSM cache 不存在，跳過 TSM 特徵。執行 scripts/prepare_tsm_features.py 建立。")
+
     return result
 
 
@@ -296,6 +314,16 @@ def get_intraday_data():
     if os.path.exists(INTRADAY_CACHE_FILE):
         print(f"Loading cached intraday snapshots from {INTRADAY_CACHE_FILE}...")
         df = pd.read_csv(INTRADAY_CACHE_FILE)
+        
+        # 檢查特徵快取是否比主快取更新（可能需要重建）
+        cache_mtime = os.path.getmtime(INTRADAY_CACHE_FILE)
+        stale_sources = []
+        for label, path in [('TSM', TSM_CACHE_FILE), ('OFI', OFI_CACHE_FILE)]:
+            if os.path.exists(path) and os.path.getmtime(path) > cache_mtime:
+                stale_sources.append(label)
+        if stale_sources:
+            print(f"WARNING: 特徵快取 [{', '.join(stale_sources)}] 比主快取更新。"
+                  f"請刪除 {INTRADAY_CACHE_FILE} 並重新執行以整合最新特徵。")
     else:
         print("Cache not found. Building intraday snapshots (this may take a minute)...")
         df = build_intraday_dataset()
