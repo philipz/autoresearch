@@ -292,6 +292,8 @@ def build_intraday_dataset():
             if col in result.columns:
                 result[col] = result[col].fillna(0.0)
         print(f"TSM 合併完成，匹配行數: {matched}/{len(result)}")
+        if matched == 0:
+            print("WARNING: TSM 匹配數為 0，請檢查 Time 欄位格式是否一致（預期 HH:MM:SS）。")
     else:
         print("WARNING: TSM cache 不存在，跳過 TSM 特徵。執行 scripts/prepare_tsm_features.py 建立。")
 

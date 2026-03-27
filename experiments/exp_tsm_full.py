@@ -275,7 +275,10 @@ def main():
     delta_morning = results[1]['morning_auc'] - results[0]['morning_auc']
 
     print(f"\n△ CV AUC     (B − A) : {delta:+.4f}")
-    print(f"△ Morning AUC (B − A) : {delta_morning:+.4f}")
+    if np.isnan(delta_morning):
+        print("△ Morning AUC (B − A) : N/A（樣本不足）")
+    else:
+        print(f"△ Morning AUC (B − A) : {delta_morning:+.4f}")
     print(f"\n資料範圍：{df_overlap['TradingDate'].min()} ~ {df_overlap['TradingDate'].max()}")
     print(f"訓練天數：{df_overlap['TradingDate'].nunique()} 天 / {len(df_overlap):,} 筆")
 

@@ -72,6 +72,8 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
         vwap     = (grp['Close'] * grp['Volume']).cumsum() / cum_vol.replace(0, np.nan)
 
         # 向量化計算
+        session_start = pd.Timestamp(str(date.date()) + ' 08:45:00')
+        session_min   = 300.0  # 08:45 ~ 13:45 = 300 分鐘
         times = pd.to_datetime(str(date.date()) + ' ' + grp['Time'])
         elapsed = (times - session_start).dt.total_seconds() / 60
         grp['Time_Progress'] = (elapsed / session_min).clip(0, 1)
@@ -179,7 +181,7 @@ def fetch_tsm_features() -> pd.DataFrame:
     if not records:
         return pd.DataFrame()
 
-    feat = pd.DataFrame(records)
+    feat = pd.concat(records, ignore_index=True)
     # 更加穩健的合併方式：按日與時間分組，將不同標的（prefix）的特徵合併至同一列
     # 由於不同標的的欄位名稱已帶有 prefix，故使用 first() 可有效合併非空值
     feat = feat.groupby(['TradingDate', 'Time_HM'], as_index=False).first()
@@ -333,7 +335,10 @@ def main():
     delta = results[1]['cv_auc_mean'] - results[0]['cv_auc_mean']
     delta_morning = results[1]['morning_auc'] - results[0]['morning_auc']
     print(f"\n△ AUC (B - A)        : {delta:+.4f}")
-    print(f"△ Morning AUC (B - A): {delta_morning:+.4f}")
+    if np.isnan(delta_morning):
+        print("△ Morning AUC (B - A): N/A（樣本不足）")
+    else:
+        print(f"△ Morning AUC (B - A): {delta_morning:+.4f}")
     print(f"\n資料範圍：{df['TradingDate'].min()} ~ {df['TradingDate'].max()}")
     print(f"訓練天數：{df['TradingDate'].nunique()} 天 / {len(df)} 筆快照")
 
