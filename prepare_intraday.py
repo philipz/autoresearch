@@ -314,6 +314,16 @@ def get_intraday_data():
     if os.path.exists(INTRADAY_CACHE_FILE):
         print(f"Loading cached intraday snapshots from {INTRADAY_CACHE_FILE}...")
         df = pd.read_csv(INTRADAY_CACHE_FILE)
+        
+        # 檢查特徵快取是否比主快取更新（可能需要重建）
+        cache_mtime = os.path.getmtime(INTRADAY_CACHE_FILE)
+        stale_sources = []
+        for label, path in [('TSM', TSM_CACHE_FILE), ('OFI', OFI_CACHE_FILE)]:
+            if os.path.exists(path) and os.path.getmtime(path) > cache_mtime:
+                stale_sources.append(label)
+        if stale_sources:
+            print(f"WARNING: 特徵快取 [{', '.join(stale_sources)}] 比主快取更新。"
+                  f"請刪除 {INTRADAY_CACHE_FILE} 並重新執行以整合最新特徵。")
     else:
         print("Cache not found. Building intraday snapshots (this may take a minute)...")
         df = build_intraday_dataset()
