@@ -44,6 +44,7 @@ DAILY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'prepared_d
 SENTIMENT_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'sentiment_cache.csv')
 INTRADAY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'intraday_snapshots.csv')
 OFI_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'ofi_features.csv')
+TSM_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'tsm_5m_features.csv')
 
 # Data split
 TRAIN_RATIO = 0.70
@@ -278,6 +279,20 @@ def build_intraday_dataset():
             print("WARNING: 'OFI' column missing after merge.")
     else:
         print("WARNING: OFI cache 不存在，跳過 OFI 特徵。")
+
+    # --- 合併 TSM 盤中特徵（若 cache 存在）---
+    if os.path.exists(TSM_CACHE_FILE):
+        print(f"合併 TSM 特徵從 {TSM_CACHE_FILE}...")
+        tsm = pd.read_csv(TSM_CACHE_FILE)
+        result = pd.merge(result, tsm, on=['TradingDate', 'Time'], how='left')
+        tsm_cols = ['TSM_5m_Ret', 'TSM_Intraday_Ret', 'TSM_Mom3', 'TSM_Vol_Ratio']
+        for col in tsm_cols:
+            if col in result.columns:
+                result[col] = result[col].fillna(0.0)
+        matched = result['TSM_5m_Ret'].astype(bool).sum()
+        print(f"TSM 合併完成，匹配行數: {matched}/{len(result)}")
+    else:
+        print("WARNING: TSM cache 不存在，跳過 TSM 特徵。執行 scripts/prepare_tsm_features.py 建立。")
 
     return result
 

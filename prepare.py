@@ -36,7 +36,7 @@ RANDOM_SEED = 42            # reproducibility seed
 
 # Data date range
 DATA_START = "2024-01-01"
-DATA_END = "2025-12-31"
+DATA_END = "2026-03-31"
 
 # Data split ratios (time-series order: train → val → test)
 TRAIN_RATIO = 0.70

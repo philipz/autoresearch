@@ -13,3 +13,6 @@ dc9c15b	0.725867	0.514580	discard	Morning-Only: 開盤段專用模型(~5k筆), n
 confidence	0.552332	0.533270	diagnostic	信心曲線診斷: 全局模型, Morning=1.0 Midday=0.97 Afternoon=0.27
 conf-mm	0.550133	0.544821	keep	Morning+Midday訓練(排Afternoon), 信心曲線: Morning=0.97 Midday=1.00
 conf-ofi	0.549397	0.543505	keep	Morning+Midday+OFI特徵(最佳配置), MM_AUC=0.5595, 信心曲線穩定
+65c0e85	0.613354	0.578769	keep	Exp-B: +TSM(2330 1m→5m)+微結構(Trade_Count/Avg_Size)+Lag, 2026資料, Morning=0.6322 MM=0.5940
+65c0e85	0.623342	0.582507	keep	Exp-D: +跨資產互動(NetOI_Momentum/Intra_Inertia/TSM_SOX_lag2), 2026資料, Morning=0.6395 MM=0.5910 CHAMPION
+65c0e85	0.623342	0.582507	keep	Final: 確認 Exp-D CHAMPION, 模型已儲存至 models/intraday_*.pkl
