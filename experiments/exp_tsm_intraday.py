@@ -65,70 +65,52 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
         open_price = grp['Open'].iloc[0]
         if open_price == 0:
             continue
-        prev_close = grp['Close'].iloc[-1]  # will use shift below
 
         day_high = grp['High'].expanding().max()
         day_low  = grp['Low'].expanding().min()
         cum_vol  = grp['Volume'].cumsum()
         vwap     = (grp['Close'] * grp['Volume']).cumsum() / cum_vol.replace(0, np.nan)
 
-        n = len(grp)
-        session_start = pd.Timestamp(str(date.date()) + ' 08:45:00')
-        session_end   = pd.Timestamp(str(date.date()) + ' 13:45:00')
-        session_min   = (session_end - session_start).total_seconds() / 60  # 300 min
+        # 向量化計算
+        times = pd.to_datetime(str(date.date()) + ' ' + grp['Time'])
+        elapsed = (times - session_start).dt.total_seconds() / 60
+        grp['Time_Progress'] = (elapsed / session_min).clip(0, 1)
+        
+        closes = grp['Close']
+        grp['Intraday_Ret_Now'] = (closes - open_price) / open_price
+        grp['VWAP_Dist'] = (closes - vwap) / vwap.replace(0, np.nan)
+        
+        vols = grp['Volume']
+        avg_vols = vols.rolling(window=20, min_periods=1).mean()
+        grp['Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)
+        
+        grp['Day_Range'] = (day_high - day_low) / open_price
+        span = day_high - day_low
+        grp['Range_Position'] = np.where(span > 0, (closes - day_low) / span, 0.5)
+        
+        grp['Bar_Body']  = (grp['Close'] - grp['Open']) / open_price
+        grp['Bar_Range'] = (grp['High']  - grp['Low'])  / open_price
+        
+        grp['Mom3'] = (closes - closes.shift(3).fillna(closes.iloc[0])) / open_price
+        grp['Mom6'] = (closes - closes.shift(6).fillna(closes.iloc[0])) / open_price
+        
+        remaining_close = closes.iloc[-1]
+        grp['Remaining_Ret'] = (remaining_close - closes) / closes
+        grp['Remaining_Dir'] = (grp['Remaining_Ret'] > 0).astype(int)
+        
+        grp['TradingDate'] = str(date.date())
+        grp['Log_Cum_Volume'] = np.log1p(cum_vol)
+        grp['Current_Price'] = closes
+        grp['Open_Price'] = open_price
+        
+        results.append(grp[[
+            'TradingDate', 'Time', 'Time_Progress', 'Intraday_Ret_Now', 'VWAP_Dist',
+            'Vol_Ratio', 'Day_Range', 'Range_Position', 'Bar_Body', 'Bar_Range',
+            'Mom3', 'Mom6', 'Log_Cum_Volume', 'Current_Price', 'Open_Price',
+            'Remaining_Ret', 'Remaining_Dir'
+        ]])
 
-        for i, row in grp.iterrows():
-            bar_time = pd.Timestamp(str(date.date()) + ' ' + row['Time'])
-            elapsed  = (bar_time - session_start).total_seconds() / 60
-            time_progress = max(0.0, min(1.0, elapsed / session_min))
-
-            close = row['Close']
-            intraday_ret_now = (close - open_price) / open_price if open_price != 0 else 0.0
-            vwap_val = vwap.iloc[i]
-            vwap_dist = (close - vwap_val) / vwap_val if (vwap_val and not np.isnan(vwap_val)) else 0.0
-
-            avg_vol = grp['Volume'].iloc[max(0, i-19):i+1].mean()
-            vol_ratio = row['Volume'] / avg_vol if avg_vol > 0 else 1.0
-
-            hi = day_high.iloc[i]
-            lo = day_low.iloc[i]
-            day_range = (hi - lo) / open_price if open_price != 0 else 0.0
-            span = hi - lo
-            range_position = (close - lo) / span if span > 0 else 0.5
-
-            bar_body  = (row['Close'] - row['Open']) / open_price if open_price != 0 else 0.0
-            bar_range = (row['High']  - row['Low'])  / open_price if open_price != 0 else 0.0
-
-            # Momentum: close relative to N bars ago
-            mom3 = (close - grp['Close'].iloc[max(0, i-3)]) / open_price if i >= 3 else 0.0
-            mom6 = (close - grp['Close'].iloc[max(0, i-6)]) / open_price if i >= 6 else 0.0
-
-            # Target: remaining return to close
-            remaining_close = grp['Close'].iloc[-1]
-            remaining_ret   = (remaining_close - close) / close if close != 0 else 0.0
-            remaining_dir   = int(remaining_ret > 0)
-
-            results.append({
-                'TradingDate':    str(date.date()),
-                'Time':           row['Time'],
-                'Time_Progress':  time_progress,
-                'Intraday_Ret_Now': intraday_ret_now,
-                'VWAP_Dist':      vwap_dist,
-                'Vol_Ratio':      vol_ratio,
-                'Day_Range':      day_range,
-                'Range_Position': range_position,
-                'Bar_Body':       bar_body,
-                'Bar_Range':      bar_range,
-                'Mom3':           mom3,
-                'Mom6':           mom6,
-                'Log_Cum_Volume': np.log1p(cum_vol.iloc[i]),
-                'Current_Price':  close,
-                'Open_Price':     open_price,
-                'Remaining_Ret':  remaining_ret,
-                'Remaining_Dir':  remaining_dir,
-            })
-
-    df = pd.DataFrame(results)
+    df = pd.concat(results, ignore_index=True)
     # Exclude last bar (no remaining return)
     df = df[df['Time'] < '13:45'].copy()
     print(f"TX snapshots built: {len(df)} rows, {df['TradingDate'].nunique()} days")
@@ -160,33 +142,47 @@ def fetch_tsm_features() -> pd.DataFrame:
 
         for date, grp in df.groupby(df.index.date):
             grp = grp.sort_values(df.index.name if df.index.name else 'Datetime')
-            open_price = grp['Close'].iloc[0]
+            open_price = grp['Open'].iloc[0]
             if open_price == 0:
                 continue
 
-            for j, (ts, row) in enumerate(grp.iterrows()):
-                close = float(row['Close'])
-                intraday_ret = (close - open_price) / open_price
-                ret_5m = (close - float(grp['Close'].iloc[max(0, j-1)])) / float(grp['Close'].iloc[max(0, j-1)]) if j > 0 else 0.0
-                mom3   = (close - float(grp['Close'].iloc[max(0, j-3)])) / open_price if j >= 3 else 0.0
-                avg_vol = float(grp['Volume'].iloc[max(0, j-19):j+1].mean())
-                vol_r  = float(row['Volume']) / avg_vol if avg_vol > 0 else 1.0
-
-                records.append({
-                    'TradingDate': str(date),
-                    'Time_HM':     ts.strftime('%H:%M'),
-                    f'{prefix}_5m_Ret':      ret_5m,
-                    f'{prefix}_Intraday_Ret': intraday_ret,
-                    f'{prefix}_Mom3':         mom3,
-                    f'{prefix}_Vol_Ratio':    vol_r,
-                })
+            closes = grp['Close'].astype(float)
+            vols   = grp['Volume'].astype(float)
+            
+            grp = grp.copy()
+            grp['TradingDate'] = str(date)
+            grp['Time_HM'] = grp.index.strftime('%H:%M')
+            grp['Intraday_Ret'] = (closes - open_price) / open_price
+            
+            prev_closes = closes.shift(1).fillna(closes.iloc[0])
+            grp['5m_Ret'] = np.where(prev_closes != 0, (closes - prev_closes) / prev_closes, 0.0)
+            
+            closes_lag3 = closes.shift(3).fillna(closes.iloc[0])
+            grp['Mom3'] = (closes - closes_lag3) / open_price
+            
+            avg_vols = vols.rolling(window=20, min_periods=1).mean()
+            grp['Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)
+            
+            # 使用 prefix 重命名欄位並加入 records
+            grp.rename(columns={
+                '5m_Ret':       f'{prefix}_5m_Ret',
+                'Intraday_Ret': f'{prefix}_Intraday_Ret',
+                'Mom3':         f'{prefix}_Mom3',
+                'Vol_Ratio':    f'{prefix}_Vol_Ratio'
+            }, inplace=True)
+            
+            records.append(grp[[
+                'TradingDate', 'Time_HM', f'{prefix}_5m_Ret',
+                f'{prefix}_Intraday_Ret', f'{prefix}_Mom3', f'{prefix}_Vol_Ratio'
+            ]])
 
     if not records:
         return pd.DataFrame()
 
     feat = pd.DataFrame(records)
-    # Pivot: one row per (TradingDate, Time_HM), columns per symbol
-    feat = feat.groupby(['TradingDate', 'Time_HM']).first().reset_index()
+    # 更加穩健的合併方式：按日與時間分組，將不同標的（prefix）的特徵合併至同一列
+    # 由於不同標的的欄位名稱已帶有 prefix，故使用 first() 可有效合併非空值
+    feat = feat.groupby(['TradingDate', 'Time_HM'], as_index=False).first()
     print(f"TSM/ETF50 features: {len(feat)} rows, {feat['TradingDate'].nunique()} days")
     return feat
 
@@ -231,7 +227,7 @@ TSM_EXTRA_FEATURES = [
 # ── Step 5：Date-Aware CV 訓練與評估 ─────────────────────────────────────────
 def run_cv(df: pd.DataFrame, features: list, label: str) -> dict:
     tscv = TimeSeriesSplit(n_splits=N_SPLITS)
-    unique_dates = df['TradingDate'].unique()
+    unique_dates = np.array(sorted(df['TradingDate'].unique()))
 
     auc_scores, morning_auc, midday_auc, afternoon_auc = [], [], [], []
 
@@ -258,10 +254,10 @@ def run_cv(df: pd.DataFrame, features: list, label: str) -> dict:
         auc_scores.append(auc)
 
         # Per-segment AUC
-        for seg, mask, lo, hi in [
-            ('morning',   te['Time_Progress'] < 0.30,  None, None),
-            ('midday',    (te['Time_Progress'] >= 0.30) & (te['Time_Progress'] < 0.70), None, None),
-            ('afternoon', te['Time_Progress'] >= 0.70, None, None),
+        for seg, mask in [
+            ('morning',   te['Time_Progress'] < 0.30),
+            ('midday',    (te['Time_Progress'] >= 0.30) & (te['Time_Progress'] < 0.70)),
+            ('afternoon', te['Time_Progress'] >= 0.70),
         ]:
             sub_te = te[mask]
             if len(sub_te) < 20:

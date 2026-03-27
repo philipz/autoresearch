@@ -47,6 +47,19 @@ t_start = time.time()
 # ---------------------------------------------------------------------------
 train_df, val_df, _ = get_intraday_data()
 
+# 檢查關鍵特徵是否存在，避免無聲降級 (Silent Degradation)
+def check_feature_availability(df):
+    missing_groups = []
+    if 'TSM_Intraday_Ret' not in df.columns: missing_groups.append("TSM 盤中特徵")
+    if 'OFI' not in df.columns: missing_groups.append("OFI 逐筆流量特徵")
+    if 'TX_Vol5' not in df.columns: missing_groups.append("市場機制 Lag 特徵 (TX_Vol5/Mom5/...)")
+    
+    if missing_groups:
+        print(f"\n[!] 警告：部分特徵群組缺失，模型將以降級模式運行：{', '.join(missing_groups)}")
+        print("    請確認已執行相關準備腳本並更新快存快取檔案 (.cache/*.csv)。\n")
+
+check_feature_availability(train_df)
+
 def engineer_features(df):
     """
     Transform raw snapshot features into model-ready features.

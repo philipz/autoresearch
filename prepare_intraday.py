@@ -286,10 +286,11 @@ def build_intraday_dataset():
         tsm = pd.read_csv(TSM_CACHE_FILE)
         result = pd.merge(result, tsm, on=['TradingDate', 'Time'], how='left')
         tsm_cols = ['TSM_5m_Ret', 'TSM_Intraday_Ret', 'TSM_Mom3', 'TSM_Vol_Ratio']
+        # Count actual matches (non-NaN before fillna)
+        matched = result['TSM_5m_Ret'].count() if 'TSM_5m_Ret' in result.columns else 0
         for col in tsm_cols:
             if col in result.columns:
                 result[col] = result[col].fillna(0.0)
-        matched = result['TSM_5m_Ret'].astype(bool).sum()
         print(f"TSM 合併完成，匹配行數: {matched}/{len(result)}")
     else:
         print("WARNING: TSM cache 不存在，跳過 TSM 特徵。執行 scripts/prepare_tsm_features.py 建立。")

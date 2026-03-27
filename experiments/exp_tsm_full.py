@@ -78,52 +78,43 @@ def resample_to_5m(raw: pd.DataFrame) -> pd.DataFrame:
         if open_price == 0:
             continue
 
-        for ts, row in grp5.iterrows():
-            records.append({
-                'TradingDate': date,
-                'Time_HM':     ts.strftime('%H:%M'),
-                'TSM_Open':    float(row['Open']),
-                'TSM_High':    float(row['High']),
-                'TSM_Low':     float(row['Low']),
-                'TSM_Close':   float(row['Close']),
-                'TSM_Volume':  float(row['Volume']),
-                'TSM_DayOpen': open_price,
-            })
+        if not grp5.empty:
+            grp5['TradingDate'] = date
+            grp5['Time_HM'] = grp5.index.strftime('%H:%M')
+            grp5['TSM_DayOpen'] = open_price
+            grp5.rename(columns={
+                'Open': 'TSM_Open', 'High': 'TSM_High', 'Low': 'TSM_Low',
+                'Close': 'TSM_Close', 'Volume': 'TSM_Volume'
+            }, inplace=True)
+            records.append(grp5)
 
-    df5 = pd.DataFrame(records)
+    df5 = pd.concat(records, ignore_index=True)
     print(f"2330 5m resampled: {len(df5):,} rows, {df5['TradingDate'].nunique()} days")
     return df5
 
 
 def compute_tsm_features(df5: pd.DataFrame) -> pd.DataFrame:
     """計算盤中 TSM 特徵（在 5m 粒度上）"""
-    results = []
-    for date, grp in df5.groupby('TradingDate'):
-        grp = grp.sort_values('Time_HM').reset_index(drop=True)
+    def _compute_day(grp):
         open_p = grp['TSM_DayOpen'].iloc[0]
+        closes = grp['TSM_Close']
+        vols   = grp['TSM_Volume']
+        
+        grp = grp.copy()
+        grp['TSM_Intraday_Ret'] = (closes - open_p) / open_p
+        
+        prev_closes = closes.shift(1).fillna(closes.iloc[0])
+        grp['TSM_5m_Ret'] = np.where(prev_closes != 0, (closes - prev_closes) / prev_closes, 0.0)
+        
+        closes_lag3 = closes.shift(3).fillna(closes.iloc[0])
+        grp['TSM_Mom3'] = (closes - closes_lag3) / open_p
+        
+        avg_vols = vols.rolling(window=20, min_periods=1).mean()
+        grp['TSM_Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)
+        
+        return grp[['TradingDate', 'Time_HM', 'TSM_5m_Ret', 'TSM_Intraday_Ret', 'TSM_Mom3', 'TSM_Vol_Ratio']]
 
-        for i, row in grp.iterrows():
-            close = row['TSM_Close']
-            intraday_ret = (close - open_p) / open_p
-
-            prev_close = grp['TSM_Close'].iloc[i-1] if i > 0 else close
-            ret_5m = (close - prev_close) / prev_close if prev_close != 0 else 0.0
-
-            mom3 = (close - grp['TSM_Close'].iloc[max(0, i-3)]) / open_p if i >= 3 else 0.0
-
-            avg_vol = grp['TSM_Volume'].iloc[max(0, i-19):i+1].mean()
-            vol_r = row['TSM_Volume'] / avg_vol if avg_vol > 0 else 1.0
-
-            results.append({
-                'TradingDate':    date,
-                'Time_HM':        row['Time_HM'],
-                'TSM_5m_Ret':     ret_5m,
-                'TSM_Intraday_Ret': intraday_ret,
-                'TSM_Mom3':       mom3,
-                'TSM_Vol_Ratio':  vol_r,
-            })
-
-    feat = pd.DataFrame(results)
+    feat = df5.groupby('TradingDate', group_keys=False).apply(_compute_day)
     print(f"TSM features computed: {len(feat):,} rows")
     return feat
 
