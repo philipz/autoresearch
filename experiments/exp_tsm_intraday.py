@@ -95,8 +95,10 @@ def build_tx_snapshots(min_date: str) -> pd.DataFrame:
         
         grp['Mom3'] = (closes - closes.shift(3)) / open_price
         grp['Mom6'] = (closes - closes.shift(6)) / open_price
-        grp['Mom3'].iloc[:3] = 0.0
-        grp['Mom6'].iloc[:6] = 0.0
+        # 避免 chained assignment 風險，使用 np.where
+        idx = np.arange(len(grp))
+        grp['Mom3'] = np.where(idx < 3, 0.0, grp['Mom3'])
+        grp['Mom6'] = np.where(idx < 6, 0.0, grp['Mom6'])
         
         remaining_close = closes.iloc[-1]
         grp['Remaining_Ret'] = (remaining_close - closes) / closes
@@ -164,7 +166,7 @@ def fetch_tsm_features() -> pd.DataFrame:
             grp['5m_Ret'] = np.where(prev_closes != 0, (closes - prev_closes) / prev_closes, 0.0)
             
             grp['Mom3'] = (closes - closes.shift(3)) / open_price
-            grp['Mom3'].iloc[:3] = 0.0
+            grp['Mom3'] = np.where(np.arange(len(grp)) < 3, 0.0, grp['Mom3'])
             
             avg_vols = vols.rolling(window=20, min_periods=1).mean()
             grp['Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)

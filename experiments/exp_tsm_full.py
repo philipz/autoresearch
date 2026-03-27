@@ -110,7 +110,8 @@ def compute_tsm_features(df5: pd.DataFrame) -> pd.DataFrame:
         
         closes_lag3 = closes.shift(3)
         grp['TSM_Mom3'] = (closes - closes_lag3) / open_p
-        grp['TSM_Mom3'].iloc[:3] = 0.0  # 案 1:1 還原：前 3 根為 0
+        # 避免 chained assignment 風險，使用 np.where
+        grp['TSM_Mom3'] = np.where(np.arange(len(grp)) < 3, 0.0, grp['TSM_Mom3'])
         
         avg_vols = vols.rolling(window=20, min_periods=1).mean()
         grp['TSM_Vol_Ratio'] = np.where(avg_vols > 0, vols / avg_vols, 1.0)
