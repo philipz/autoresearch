@@ -91,8 +91,8 @@ def _compute_night_features(kbar_day: pd.DataFrame) -> pd.DataFrame:
     bar_body  = (kbar['Close'] - kbar['Open']) / night_open
     bar_range = (kbar['High']  - kbar['Low'])  / night_open
 
-    mom3 = ((current_price - kbar['Close'].shift(2)) / kbar['Close'].shift(2)).fillna(0.0)
-    mom6 = ((current_price - kbar['Close'].shift(5)) / kbar['Close'].shift(5)).fillna(0.0)
+    mom3 = ((current_price - kbar['Close'].shift(3)) / kbar['Close'].shift(3)).fillna(0.0)
+    mom6 = ((current_price - kbar['Close'].shift(6)) / kbar['Close'].shift(6)).fillna(0.0)
 
     remaining_ret    = (night_close - current_price) / current_price
     remaining_dir    = (remaining_ret > 0).astype(int)
@@ -165,9 +165,16 @@ def build_night_intraday_dataset() -> pd.DataFrame:
         sys.exit(1)
 
     valid_kbar = kbar[kbar['TradingDate'].isin(common_dates)]
+
+    def _compute_with_date(grp):
+        snaps = _compute_night_features(grp)
+        if len(snaps) > 0:
+            snaps['TradingDate'] = grp['TradingDate'].iloc[0]
+        return snaps
+
     all_snaps = (
         valid_kbar.groupby('TradingDate', group_keys=False)
-        .apply(_compute_night_features)
+        .apply(_compute_with_date)
         .reset_index(drop=True)
     )
 
