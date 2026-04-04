@@ -39,6 +39,17 @@ LATE_CUTOFF  = 0.65
 
 # ─────────────── A. Feature Engineering ───────────────
 
+def check_feature_availability(df: pd.DataFrame) -> None:
+    """夜盤靜態特徵可用性檢查，在訓練前呼叫，防止靜默降級。"""
+    missing_groups = []
+    night_static_cols = ['Night_TSM_Ret', 'Night_SOX_Ret', 'Night_NetOI_Diff_lag1']
+    missing_static = [c for c in night_static_cols if c not in df.columns or df[c].eq(0).all()]
+    if missing_static:
+        missing_groups.append(f"夜盤靜態特徵（{missing_static}）")
+    if missing_groups:
+        print(f"\n[!] 警告：部分特徵群組缺失或全為 0，模型將以降級模式運行：{', '.join(missing_groups)}")
+        print("    請確認 prepare_night_intraday.py 的靜態特徵對齊邏輯。\n")
+
 def engineer_features(df: pd.DataFrame) -> dict:
     X = pd.DataFrame(index=df.index)
 
@@ -76,7 +87,13 @@ def engineer_features(df: pd.DataFrame) -> dict:
         if col in df.columns:
             X[col] = df[col]
 
+    # 注意：夜盤無「開盤跳空」概念（Open_Gap），故不包含 Open_Gap_sq / Open_Gap_abs
+    # 相關信號已由 Night_TSM_Ret、Night_SOX_Ret 等隔夜資訊取代。
+
     # 動能慣性（每日內滾動）
+    # Ret_Persistence: 當日內 3-bar 報酬滾動和（groupby TradingDate 確保不跨日）
+    # 注意：此值在 CV loop 中以整個 train_df 計算後用 mask 切分，
+    # 因 groupby TradingDate 隔離跨日洩漏，但 rolling 在單日邊界內是正確的。
     X['Ret_Persistence'] = df.groupby('TradingDate')['Intraday_Ret_Now'].transform(
         lambda x: x.rolling(3).sum().fillna(0)
     )
@@ -236,6 +253,8 @@ if __name__ == "__main__":
     print("=" * 60)
 
     train_df, val_df, _ = get_night_intraday_data()
+
+    check_feature_availability(train_df)
 
     t_train_start = time.time()
     metrics = train_and_evaluate(train_df, val_df)
