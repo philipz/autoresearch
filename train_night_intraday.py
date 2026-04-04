@@ -80,6 +80,24 @@ def engineer_features(df: pd.DataFrame) -> dict:
     X['Ret_abs']      = np.abs(df['Intraday_Ret_Now'])
     X['Log_Vol_Ratio'] = np.log1p(df['Vol_Ratio'].clip(lower=0))
 
+    # 非線性動能特徵
+    X['Mom3_sq']      = df['Mom3'] ** 2
+    X['Mom3_signed_sqrt'] = np.sign(df['Mom3']) * np.sqrt(np.abs(df['Mom3']))
+    X['Mom6_sq']      = df['Mom6'] ** 2
+
+    # 時段特化特徵：早盤強調（Early 段信號更可靠）
+    early_weight = (1.0 - df['Time_Progress'])
+    X['Ret_Early']    = df['Intraday_Ret_Now'] * early_weight
+    X['Mom3_Early']   = df['Mom3'] * early_weight
+    X['VWAP_Early']   = df['VWAP_Dist'] * early_weight
+
+    # VWAP 互動特徵
+    X['VWAP_x_VolRatio'] = df['VWAP_Dist'] * df['Vol_Ratio']
+
+    # 籌碼 × 報酬互動
+    if 'Night_NetOI_Diff_lag1' in df.columns:
+        X['OI_x_Ret'] = df['Night_NetOI_Diff_lag1'] * df['Intraday_Ret_Now']
+
     # 靜態特徵（T-1 日）
     for col in ['Night_TSM_Ret', 'Night_SOX_Ret', 'Night_NetOI_Diff_lag1',
                 'Night_TX_Ret', 'Night_TSM_Ret_lag2', 'Night_SOX_Ret_lag2',
