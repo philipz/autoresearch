@@ -119,6 +119,18 @@ def engineer_features(df: pd.DataFrame) -> dict:
     early_mask = (df['Time_Progress'] < EARLY_CUTOFF).astype(float)
     X['VWAP_Early_Strong'] = df['VWAP_Dist'] * df['Vol_Ratio'] * early_mask
 
+    # 靜態特徵 × 動態特徵互動
+    if 'Night_TX_Mom5' in df.columns:
+        X['TXMom5_x_Ret']   = df['Night_TX_Mom5'] * df['Intraday_Ret_Now']  # TX 趨勢 × 盤中漲跌
+        X['TXMom5_x_Mom3']  = df['Night_TX_Mom5'] * df['Mom3']              # TX 趨勢 × 短期動能
+
+    if 'Night_TX_Vol5' in df.columns:
+        X['TXVol5_x_BarRange'] = df['Night_TX_Vol5'] * df['Bar_Range']   # 波動環境 × 當根影線
+
+    # T-2 美股 × 動態特徵
+    if 'Night_TSM_Ret_lag2' in df.columns:
+        X['TSMlag2_x_Ret']  = df['Night_TSM_Ret_lag2'] * df['Intraday_Ret_Now']
+
     # 靜態特徵（T-1 日）
     for col in ['Night_TSM_Ret', 'Night_SOX_Ret', 'Night_NetOI_Diff_lag1',
                 'Night_TX_Ret', 'Night_TSM_Ret_lag2', 'Night_SOX_Ret_lag2',
