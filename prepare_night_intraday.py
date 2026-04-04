@@ -56,6 +56,8 @@ def _compute_night_features(kbar_day: pd.DataFrame) -> pd.DataFrame:
     """
     if len(kbar_day) == 0:
         return pd.DataFrame()
+    if len(kbar_day) < 2:
+        return pd.DataFrame()
 
     kbar = kbar_day.sort_values('Time').reset_index(drop=True)
     night_open  = kbar['Open'].iloc[0]
@@ -74,9 +76,10 @@ def _compute_night_features(kbar_day: pd.DataFrame) -> pd.DataFrame:
     vwap_safe = np.where(vwap > 0, vwap, 1.0)
     vwap_dist = (current_price - vwap) / vwap_safe
 
-    prior_cum_vol = cum_volume - kbar['Volume']
-    avg_prior_vol = np.where(kbar.index > 0, prior_cum_vol / kbar.index, kbar['Volume'])
-    vol_ratio = np.where(avg_prior_vol > 0, kbar['Volume'] / avg_prior_vol, 1.0)
+    prior_cum_vol = (cum_volume - kbar['Volume']).values
+    idx = np.arange(len(kbar))
+    avg_prior_vol = np.where(idx > 0, prior_cum_vol / np.maximum(idx, 1), kbar['Volume'].values)
+    vol_ratio = np.where(avg_prior_vol > 0, kbar['Volume'].values / avg_prior_vol, 1.0)
 
     day_range   = (running_high - running_low) / night_open
     range_span  = running_high - running_low
@@ -131,6 +134,9 @@ def _load_daily_features() -> pd.DataFrame:
         if col in df.columns:
             df[f'Night_{col}'] = df[col].shift(1)
 
+    night_nan_cols = [c for c in df.columns if c.startswith('Night_') and df[c].isna().any()]
+    if night_nan_cols:
+        print(f"WARNING: {len(night_nan_cols)} Night_ columns have NaN (filled with 0): {night_nan_cols[:3]}...")
     df.ffill(inplace=True)
     df.fillna(0.0, inplace=True)
     return df
@@ -159,11 +165,11 @@ def build_night_intraday_dataset() -> pd.DataFrame:
         sys.exit(1)
 
     valid_kbar = kbar[kbar['TradingDate'].isin(common_dates)]
-    all_snaps = valid_kbar.groupby('TradingDate', group_keys=True).apply(
-        _compute_night_features
-    ).reset_index()
-    if 'level_1' in all_snaps.columns:
-        all_snaps.drop(columns=['level_1'], inplace=True)
+    all_snaps = (
+        valid_kbar.groupby('TradingDate', group_keys=False)
+        .apply(_compute_night_features)
+        .reset_index(drop=True)
+    )
 
     night_static_cols = [c for c in daily.columns if c.startswith('Night_')]
     result = pd.merge(
