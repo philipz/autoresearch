@@ -107,6 +107,18 @@ def engineer_features(df: pd.DataFrame) -> dict:
     X['Vol_Ratio_sq']    = df['Vol_Ratio'] ** 2
     X['LogVol_x_Time']   = np.log1p(df['Vol_Ratio'].clip(lower=0)) * df['Time_Progress']
 
+    # 動能加速度（短期減長期動能）
+    X['Mom_Accel']       = df['Mom3'] - df['Mom6']  # 動能是在加速還是減速
+    X['Mom_Accel_sq']    = X['Mom_Accel'] ** 2
+
+    # Bar 型態互動
+    X['Body_x_RangePos'] = df['Bar_Body'] * df['Range_Position']  # 蠟燭實體在高低位置
+    X['Range_x_Vol']     = df['Bar_Range'] * df['Vol_Ratio']       # 影線 × 量
+
+    # 早盤 VWAP 背離強化（早盤 VWAP 偏離更有意義）
+    early_mask = (df['Time_Progress'] < EARLY_CUTOFF).astype(float)
+    X['VWAP_Early_Strong'] = df['VWAP_Dist'] * df['Vol_Ratio'] * early_mask
+
     # 靜態特徵（T-1 日）
     for col in ['Night_TSM_Ret', 'Night_SOX_Ret', 'Night_NetOI_Diff_lag1',
                 'Night_TX_Ret', 'Night_TSM_Ret_lag2', 'Night_SOX_Ret_lag2',
