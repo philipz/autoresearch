@@ -98,6 +98,15 @@ def engineer_features(df: pd.DataFrame) -> dict:
     if 'Night_NetOI_Diff_lag1' in df.columns:
         X['OI_x_Ret'] = df['Night_NetOI_Diff_lag1'] * df['Intraday_Ret_Now']
 
+    # 跨資產動能特徵
+    if 'Night_TSM_Ret' in df.columns and 'Night_SOX_Ret' in df.columns:
+        X['TSM_x_SOX'] = df['Night_TSM_Ret'] * df['Night_SOX_Ret']  # 同向/背離
+        X['TSM_minus_SOX'] = df['Night_TSM_Ret'] - df['Night_SOX_Ret']  # 半導體 vs 台積電
+
+    # Vol 加速度特徵
+    X['Vol_Ratio_sq']    = df['Vol_Ratio'] ** 2
+    X['LogVol_x_Time']   = np.log1p(df['Vol_Ratio'].clip(lower=0)) * df['Time_Progress']
+
     # 靜態特徵（T-1 日）
     for col in ['Night_TSM_Ret', 'Night_SOX_Ret', 'Night_NetOI_Diff_lag1',
                 'Night_TX_Ret', 'Night_TSM_Ret_lag2', 'Night_SOX_Ret_lag2',
