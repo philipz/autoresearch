@@ -1,0 +1,12 @@
+commit	composite_score	val_dir_auc	status	description
+1c88a75	0.929376	0.536762	keep	Baseline: 夜盤 pipeline，Early AUC=0.5911，Evening=0.5521，Late=0.4487
+97064f1	0.899726	0.576861	keep	Exp1: nonlinear momentum(Mom3_sq,signed_sqrt), time-segment features(Ret_Early,Mom3_Early), VWAP×VolRatio, OI×Ret; Early AUC=0.6301, Evening=0.5909, Late=0.4821
+7fdf1f6	0.934955	0.569889	discard	Exp2: deeper LightGBM (num_leaves=63,n_est=1500,lr=0.007) - overfit, worse than exp1
+c3b11df	0.877910	0.590721	keep	Exp3: cross-asset momentum(TSM×SOX,TSM-SOX), vol acceleration; Early AUC=0.6479, Evening=0.5805, Late=0.5205
+501ae50	0.881666	0.586530	discard	Exp4: VolRegime×features, late-segment features - slight regression vs exp3
+abfa8af	0.877132	0.593815	keep	Exp5: momentum acceleration(Mom3-Mom6), bar pattern, early VWAP amplification; Early AUC=0.6575, Evening=0.5844, Late=0.5122
+7f8ce3b	0.872849	0.602015	keep	Exp6: TXMom5/TXVol5×dynamic features, TSMlag2×Ret; Early AUC=0.6510, Evening=0.5973, Late=0.5351
+6be40b0	0.879192	0.592469	discard	Exp7: early RetPers, direction consistency, OI×TXRet - slight regression vs exp6
+8cf6d27	0.877849	0.575740	discard	Exp8: SOXlag2×dynamic, Evening-segment features - AUC regression despite lower pts_mae
+9690ed7	0.878684	0.589369	discard	Exp9: tune hyperparams (num_leaves=47,n_est=1200,lr=0.008) - slight regression vs exp6
+a7b943f	0.873727	0.600017	discard	Exp10: LogVol_per_Time (cumvol/time_progress) - marginal regression vs exp6
