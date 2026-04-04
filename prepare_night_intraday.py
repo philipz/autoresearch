@@ -59,7 +59,9 @@ def _compute_night_features(kbar_day: pd.DataFrame) -> pd.DataFrame:
     if len(kbar_day) < 2:
         return pd.DataFrame()
 
-    kbar = kbar_day.sort_values('Time').reset_index(drop=True)
+    kbar = kbar_day.copy()
+    kbar['_elapsed'] = kbar['Time'].apply(_night_time_to_elapsed_minutes)
+    kbar = kbar.sort_values('_elapsed').drop(columns='_elapsed').reset_index(drop=True)
     night_open  = kbar['Open'].iloc[0]
     night_close = kbar['Close'].iloc[-1]
 
