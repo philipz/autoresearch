@@ -113,6 +113,18 @@ def engineer_features(df):
     X['Night_Ret_x_Vol5']  = df['Night_Ret_vs_Day'] * df['TX_Vol5']        # 夜盤幅度 × 市場波動
     X['NetOI_x_TXMom5']   = df['NetOI_Diff_lag1'] * df['TX_Mom5']          # 籌碼 × 市場趨勢
 
+    # Day-of-week (週期性效應，週五/週一前後跳空傾向不同)
+    dow = pd.to_datetime(df.index).dayofweek  # 0=Monday, 4=Friday
+    X['DayOfWeek_sin']     = np.sin(2 * np.pi * dow / 5)
+    X['DayOfWeek_cos']     = np.cos(2 * np.pi * dow / 5)
+    X['Is_Friday']         = (dow == 4).astype(float)
+    X['Is_Monday']         = (dow == 0).astype(float)
+
+    # Rolling momentum of night returns (夜盤動能慣性)
+    X['Night_Ret_roll3']   = df['Night_Ret_vs_Day'].rolling(3, min_periods=1).mean()
+    X['Night_Ret_roll3'].fillna(0, inplace=True)
+
+
     X.fillna(0, inplace=True)
 
     leaky = ['Gap_Direction', 'Open_Gap']
@@ -198,7 +210,7 @@ def train_and_evaluate_cv(train_df, val_df):
             auc = 0.5
         cv_auc.append(auc)
 
-        # Gap regressor
+        # Gap regressor (RandomForest)
         reg = lgb.LGBMRegressor(**REG_PARAMS)
         reg.fit(X_reg_train.iloc[tr_idx], y_gap_train.iloc[tr_idx])
         preds = reg.predict(X_reg_train.iloc[te_idx])
