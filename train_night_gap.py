@@ -65,38 +65,30 @@ def engineer_features(df):
 
     # Core night session signals
     X['Night_Ret_vs_Day']  = df['Night_Ret_vs_Day']    # total overnight return
-    X['Night_Body']        = df['Night_Body']           # night session internal move
     X['Night_Range']       = df['Night_Range']          # night session volatility
     X['Night_Vol_Change']  = df['Night_Vol_Change']     # volume momentum
+    X['Night_Gap_Open']    = df['Night_Gap_Open']       # 夜盤自身跳空
 
     # US market signals (T-1 shifted, no leakage)
     X['TSM_Ret']           = df['TSM_Ret']
     X['SOX_Ret']           = df['SOX_Ret']
     X['NetOI_Diff_lag1']   = df['NetOI_Diff_lag1']
 
-    # --- Extended features (uncomment/modify to experiment) ---
-    # Night session gap open (夜盤自身跳空)
-    # X['Night_Gap_Open'] = df['Night_Gap_Open']
-
     # Market momentum & volatility regime
-    # X['TX_Vol5']  = df['TX_Vol5']
-    # X['TX_Mom5']  = df['TX_Mom5']
-    # X['RSI']      = df['RSI']
+    X['TX_Vol5']           = df['TX_Vol5']
+    X['TX_Mom5']           = df['TX_Mom5']
 
-    # Lagged US signals
-    # X['TSM_Ret_lag2'] = df['TSM_Ret_lag2']
-    # X['SOX_Ret_lag2'] = df['SOX_Ret_lag2']
-    # X['TSM_SOX_Spread'] = df['TSM_SOX_Spread']
+    # Cross-asset interactions
+    X['TSM_x_Night_Ret']   = df['TSM_Ret'] * df['Night_Ret_vs_Day']
+    X['SOX_x_Night_Ret']   = df['SOX_Ret'] * df['Night_Ret_vs_Day']
+    X['Night_Range_x_Vol'] = df['Night_Range'] * df['Night_Vol_Change']
+    X['TSM_SOX_Spread']    = df['TSM_SOX_Spread']
 
-    # Feature interactions
-    # X['Night_Ret_x_Body']   = df['Night_Ret_vs_Day'] * df['Night_Body']
-    # X['Night_Range_x_Vol']  = df['Night_Range'] * df['Night_Vol_Change']
-    # X['TSM_x_Night_Ret']    = df['TSM_Ret'] * df['Night_Ret_vs_Day']
-    # X['SOX_x_Night_Ret']    = df['SOX_Ret'] * df['Night_Ret_vs_Day']
-
-    # Non-linear transforms
-    # X['Night_Range_sq']  = df['Night_Range'] ** 2
-    # X['Night_Ret_abs']   = np.abs(df['Night_Ret_vs_Day'])
+    # Non-linear transforms (magnitude signals for regressor)
+    X['Night_Range_sq']    = df['Night_Range'] ** 2
+    X['Night_Ret_abs']     = np.abs(df['Night_Ret_vs_Day'])
+    X['TSM_Ret_abs']       = np.abs(df['TSM_Ret'])
+    X['SOX_Ret_abs']       = np.abs(df['SOX_Ret'])
 
     X.fillna(0, inplace=True)
 
