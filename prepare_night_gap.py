@@ -35,6 +35,7 @@ VAL_RATIO    = 0.15
 # TEST_RATIO  = 0.15 (implicit)
 
 NIGHT_KBAR_FILE  = os.path.join(PROJECT_ROOT, 'data', 'raw', 'tx_night_5m_kbar.csv')
+REGULAR_TX_FILE  = os.path.join(PROJECT_ROOT, 'data', 'raw', 'taifex_tx_2024_2025.csv')
 DAILY_CACHE_FILE = os.path.join(os.path.dirname(__file__), '.cache', 'prepared_data.csv')
 NIGHT_GAP_CACHE  = os.path.join(os.path.dirname(__file__), '.cache', 'night_gap_prepared.csv')
 
@@ -81,9 +82,21 @@ def _build_features(night_df: pd.DataFrame, daily_df: pd.DataFrame) -> pd.DataFr
     safe_open = df['Night_Open'].replace(0, np.nan)
 
     # 核心夜盤特徵
-    # Night_Ret_vs_Day: 夜盤收盤 vs 夜盤開盤（代理 T-1 收盤）
-    df['Night_Ret_vs_Day']  = np.log(df['Night_Close'] / safe_open)
-    # Night_Body: 夜盤內部 K 線實體（收 vs 開）
+    # Night_Ret_vs_Day: 夜盤收盤 vs 前一日盤收盤（T-1 regular close）
+    # 優先從原始日盤資料取得 Day_Prev_Close；若不存在則以 Night_Open 為代理（誤差 ±0.1~0.2%）
+    if os.path.exists(REGULAR_TX_FILE):
+        reg = pd.read_csv(REGULAR_TX_FILE)
+        reg = reg[reg['交易時段'] == '一般'].copy()
+        reg['_date'] = pd.to_datetime(reg['Date']).dt.strftime('%Y-%m-%d')
+        reg = reg.sort_values('_date').drop_duplicates('_date', keep='first').set_index('_date')
+        day_prev_close = reg['收盤價'].shift(1).rename('_day_prev_close')
+        df = df.join(day_prev_close, how='left')
+        safe_prev_close = df['_day_prev_close'].replace(0, np.nan)
+        df.drop(columns=['_day_prev_close'], inplace=True)
+    else:
+        safe_prev_close = safe_open  # fallback proxy
+    df['Night_Ret_vs_Day']  = np.log(df['Night_Close'] / safe_prev_close)
+    # Night_Body: 夜盤 K 線實體（收 vs 開），語義上與 Night_Ret_vs_Day 不同
     df['Night_Body']        = np.log(df['Night_Close'] / safe_open)
     # Night_Range: 夜盤高低波幅 / 開盤
     df['Night_Range']       = (df['Night_High'] - df['Night_Low']) / safe_open
@@ -108,6 +121,9 @@ def _build_features(night_df: pd.DataFrame, daily_df: pd.DataFrame) -> pd.DataFr
     # Targets
     df['Gap_Direction'] = daily_df['Gap_Direction']
     df['Open_Gap']      = daily_df['Open_Gap']
+
+    # Night_Ret_roll3: 3 日滾動均值，在完整資料集上計算以避免 train/val 邊界 cold-start
+    df['Night_Ret_roll3'] = df['Night_Ret_vs_Day'].rolling(3, min_periods=1).mean()
 
     df = df.dropna(subset=['Night_Ret_vs_Day', 'Gap_Direction', 'Open_Gap'])
     df = df.replace([np.inf, -np.inf], np.nan).fillna(0.0)

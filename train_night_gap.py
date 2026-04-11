@@ -45,7 +45,8 @@ def engineer_features(df):
 
     Available raw columns from prepare_night_gap.py:
         Night_Open, Night_High, Night_Low, Night_Close, Night_Vol, Night_Bars
-        Night_Ret_vs_Day, Night_Body, Night_Range, Night_Vol_Change, Night_Gap_Open
+        Night_Ret_vs_Day, Night_Body, Night_Range, Night_Vol_Change, Night_Gap_Open,
+        Night_Ret_roll3
         TSM_Ret, SOX_Ret, NetOI_Diff_lag1, NetOI_Diff_lag2
         TX_Ret, TX_Ret_lag1, TX_Vol5, TX_Mom5
         RSI, MA5, MA20, TSM_Ret_lag2, SOX_Ret_lag2, TSM_SOX_Spread, Intra_Ret_lag1
@@ -121,8 +122,8 @@ def engineer_features(df):
     X['Is_Monday']         = (dow == 0).astype(float)
 
     # Rolling momentum of night returns (夜盤動能慣性)
-    X['Night_Ret_roll3']   = df['Night_Ret_vs_Day'].rolling(3, min_periods=1).mean()
-    X['Night_Ret_roll3'].fillna(0, inplace=True)
+    # 使用 prepare_night_gap.py 在完整資料集上預計算的欄位，避免 train/val 邊界 cold-start
+    X['Night_Ret_roll3']   = df['Night_Ret_roll3']
 
 
     X.fillna(0, inplace=True)
@@ -210,7 +211,7 @@ def train_and_evaluate_cv(train_df, val_df):
             auc = 0.5
         cv_auc.append(auc)
 
-        # Gap regressor (RandomForest)
+        # Gap regressor (LightGBM)
         reg = lgb.LGBMRegressor(**REG_PARAMS)
         reg.fit(X_reg_train.iloc[tr_idx], y_gap_train.iloc[tr_idx])
         preds = reg.predict(X_reg_train.iloc[te_idx])
