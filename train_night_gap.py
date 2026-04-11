@@ -102,6 +102,12 @@ def engineer_features(df):
     X['NetOI_momentum']    = df['NetOI_Diff_lag1'] - df['NetOI_Diff_lag2']  # 籌碼加速度
     X['Vol5_x_Night_Range']= df['TX_Vol5'] * df['Night_Range']              # 波動機制 × 夜盤振幅
 
+    # Momentum interactions (趨勢共振)
+    X['TXMom5_x_Night_Ret']= df['TX_Mom5'] * df['Night_Ret_vs_Day']        # 市場趨勢 × 夜盤報酬
+    X['Intra_x_Night_Ret'] = df['Intra_Ret_lag1'] * df['Night_Ret_vs_Day'] # 昨日盤中慣性 × 夜盤
+    X['TSM_lag2_x_SOX_lag2'] = df['TSM_Ret_lag2'] * df['SOX_Ret_lag2']     # 2日前跨資產
+    X['Night_Gap_Open_sq'] = df['Night_Gap_Open'] ** 2                      # 夜盤跳空非線性
+
     X.fillna(0, inplace=True)
 
     leaky = ['Gap_Direction', 'Open_Gap']
