@@ -108,6 +108,11 @@ def engineer_features(df):
     X['TSM_lag2_x_SOX_lag2'] = df['TSM_Ret_lag2'] * df['SOX_Ret_lag2']     # 2日前跨資產
     X['Night_Gap_Open_sq'] = df['Night_Gap_Open'] ** 2                      # 夜盤跳空非線性
 
+    # More regime interactions (波動機制 × 信號強度)
+    X['SOX_x_Vol5']        = df['SOX_Ret'] * df['TX_Vol5']                  # SOX × 波動機制
+    X['Night_Ret_x_Vol5']  = df['Night_Ret_vs_Day'] * df['TX_Vol5']        # 夜盤幅度 × 市場波動
+    X['NetOI_x_TXMom5']   = df['NetOI_Diff_lag1'] * df['TX_Mom5']          # 籌碼 × 市場趨勢
+
     X.fillna(0, inplace=True)
 
     leaky = ['Gap_Direction', 'Open_Gap']
