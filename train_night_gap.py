@@ -90,6 +90,18 @@ def engineer_features(df):
     X['TSM_Ret_abs']       = np.abs(df['TSM_Ret'])
     X['SOX_Ret_abs']       = np.abs(df['SOX_Ret'])
 
+    # Lag features (momentum persistence)
+    X['TSM_Ret_lag2']      = df['TSM_Ret_lag2']
+    X['SOX_Ret_lag2']      = df['SOX_Ret_lag2']
+    X['TX_Ret_lag1']       = df['TX_Ret_lag1']
+    X['Intra_Ret_lag1']    = df['Intra_Ret_lag1']
+    X['NetOI_Diff_lag2']   = df['NetOI_Diff_lag2']
+
+    # Institutional flow × night move interaction
+    X['NetOI_x_Night_Ret'] = df['NetOI_Diff_lag1'] * df['Night_Ret_vs_Day']
+    X['NetOI_momentum']    = df['NetOI_Diff_lag1'] - df['NetOI_Diff_lag2']  # 籌碼加速度
+    X['Vol5_x_Night_Range']= df['TX_Vol5'] * df['Night_Range']              # 波動機制 × 夜盤振幅
+
     X.fillna(0, inplace=True)
 
     leaky = ['Gap_Direction', 'Open_Gap']
