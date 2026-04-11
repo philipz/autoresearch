@@ -1,0 +1,13 @@
+commit	composite_score	val_gap_auc	status	description
+5dc88df	0.675109	0.840889	keep	Baseline: 7 features (Night OHLCV + TSM/SOX/NetOI), LightGBM, AUC=0.84 但 MAE=119 拖低 composite
+exp1	0.675421	0.865778	discard	Exp1: 加 TX_Vol5/Mom5/RSI/lags，AUC 升但 MAE 略差，composite 打平
+b11e925	0.650007	0.863111	keep	Exp2: 跨資產互動(TSM_x_Night/SOX_x_Night/Range_x_Vol)+非線性幅度特徵
+exp3	0.686222	0.859556	discard	Exp3: 調低 lr=0.02+mae objective，反而更差
+d7c4fb3	0.578425	0.921778	keep	Exp4: lag特徵(TSM/SOX/TX/NetOI)+NetOI動量+Vol5_x_Range，AUC=0.922
+exp5	0.590170	0.926222	discard	Exp5: 更多樹(600)+lr=0.03，AUC升但MAE退，composite差
+exp6	0.582679	0.934222	discard	Exp6: 加RSI/MA/超買超賣特徵，AUC=0.934但MAE=110，composite差
+a1dbce3	0.570558	0.923556	keep	Exp7: TXMom5_x_Night+盤中慣性×夜盤+lag交叉，MAE=106
+78986dc	0.563509	0.936000	keep	Exp8: SOX_x_Vol5+Night_Ret_x_Vol5+NetOI_x_TXMom5，AUC=0.936 acc=87.1%
+exp9	0.580833	0.926222	discard	Exp9: Night_Gap_Open × 4個互動，過擬合，三指標全退
+exp10	0.623202	0.936000	discard	Exp10: RF替代LGBMReg，MAE=118 退步
+85c5a68	0.535853	0.939556	keep	Exp11: DayOfWeek(sin/cos/Fri/Mon)+Rolling3_NightRet，MAE=101 AUC=0.940 CHAMPION
