@@ -1,0 +1,50 @@
+Loading cached night gap data from /Users/cfh00805122/lab/playground/futures-research/autoresearch_sandbox/.cache/night_gap_prepared.csv...
+Night gap data loaded: train=324, val=70, test=70
+============================================================
+Autoresearch Sandbox — Night Gap Model Training
+============================================================
+
+Running 5-fold TimeSeriesSplit CV...
+  Fold 1: AUC=0.8153, MAE=161.35 pts
+  Fold 2: AUC=0.7441, MAE=135.58 pts
+  Fold 3: AUC=0.8703, MAE=128.31 pts
+  Fold 4: AUC=0.8177, MAE=189.39 pts
+  Fold 5: AUC=0.8044, MAE=101.04 pts
+
+CV Averages:
+  Gap AUC: 0.8104 ± 0.0402
+  Gap MAE: 143.13 ± 30.07 pts
+
+Training final models on full training set...
+
+Validation set evaluation:
+  Gap Accuracy: 0.8714
+  Gap AUC:      0.9396
+  Gap MAE:      101.13 pts
+  Gap MSE:      23455.88
+
+[Top 10 Feature Importance — Direction Classifier]
+  Night_Gap_Open: 216.0000
+  TSM_Ret: 145.0000
+  SOX_Ret: 145.0000
+  NetOI_x_Night_Ret: 137.0000
+  TX_Ret_lag1: 131.0000
+  Night_Vol_Change: 126.0000
+  Night_Ret_roll3: 126.0000
+  TSM_SOX_Spread: 122.0000
+  Intra_Ret_lag1: 117.0000
+  SOX_Ret_abs: 100.0000
+
+---
+composite_score:  0.535853
+val_gap_auc:      0.939556
+val_gap_acc:      0.871429
+val_gap_mae:      101.13
+val_gap_mse:      23455.88
+cv_gap_auc_mean:  0.810365
+cv_gap_mae_mean:  143.13
+training_seconds: 2.6
+total_seconds:    2.6
+n_splits:         5
+train_rows:       324
+val_rows:         70
